@@ -21,7 +21,7 @@ const app = express();
 
 // -------------------- CORS --------------------
 const allowedOrigins = [
-  "https://jgaa_projects_capstone.vercel.app", // Vercel frontend
+  "https://jgaa-projects-capstone.vercel.app/", // Vercel frontend
   "http://localhost:5173", // local dev Vite
   "http://localhost:3000", // local dev CRA
 ];
