@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import "react-calendar/dist/Calendar.css";
 import {
   FaBoxOpen,
   FaDollarSign,
@@ -6,20 +7,18 @@ import {
   FaTags,
   FaWallet,
 } from "react-icons/fa";
-
-import "react-calendar/dist/Calendar.css";
-
-import TopSelling from "../../components/admin/TopSelling";
-import TotalRevenue from "../../components/admin/TotalRevenue";
-import DailySalesChart from "../charts/DailySalesChart";
-import MonthlySalesChart from "../charts/MonthlySalesChart";
+import TopSelling from "../../components/worker/WorkerTopSelling";
+import TotalRevenue from "../../components/worker/WorkerTotalRevenue";
 import MostReservedTablesChart from "../charts/MostReservedTablesChart";
 import TopSellingProductsChart from "../charts/TopSellingProductsChart";
 import TotalCustomersChart from "../charts/TotalCustomersChart";
-import WeeklySalesChart from "../charts/WeeklySalesChart";
-import YearlySalesChart from "../charts/YearlySalesChart";
-import CategoriesModal from "./AdminModals/CategoriesModal";
-import TotalProductsModal from "./AdminModals/TotalProductsModal";
+import CategoriesModal from "../WorkerModals/CategoriesModal";
+import TotalProductsModal from "../WorkerModals/TotalProductsModal";
+
+import { Button, DatePicker, Modal, message } from "antd";
+import dayjs, { Dayjs } from "dayjs";
+import { AiOutlineArrowRight } from "react-icons/ai";
+import { FiCalendar, FiFilter } from "react-icons/fi";
 
 interface Category {
   categories_id: number;
@@ -29,130 +28,130 @@ interface Category {
 }
 
 const AdminDashboard = () => {
+  // --- 🔸 States for Filter Modal ---
+  const today = dayjs();
+  const firstDayOfMonth = today.startOf("month");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [startDate, setStartDate] = useState<Dayjs | null>(firstDayOfMonth);
+  const [endDate, setEndDate] = useState<Dayjs | null>(today);
+  const [dates, setDates] = useState<[Dayjs | null, Dayjs | null]>([
+    firstDayOfMonth,
+    today,
+  ]);
+
+  // --- 🔸 States for Cards and Stats ---
   const [totalProducts, setTotalProducts] = useState<number | null>(null);
   const [changeData, setChangeData] = useState<{
     change: string;
     changeType: "up" | "down";
-  }>({
-    change: "",
-    changeType: "up",
-  });
+  }>({ change: "", changeType: "up" });
 
   const [totalCategories, setTotalCategories] = useState<number | null>(null);
   const [categoriesChangeData, setCategoriesChangeData] = useState<{
     change: string;
     changeType: "up" | "down";
-  }>({
-    change: "",
-    changeType: "up",
-  });
+  }>({ change: "", changeType: "up" });
 
   const [isProductsModalVisible, setIsProductsModalVisible] = useState(false);
-  const openProductsModal = () => setIsProductsModalVisible(true);
-  const closeProductsModal = () => setIsProductsModalVisible(false);
-
   const [isCategoriesModalVisible, setIsCategoriesModalVisible] =
     useState(false);
-  const openCategoriesModal = () => setIsCategoriesModalVisible(true);
-  const closeCategoriesModal = () => setIsCategoriesModalVisible(false);
-
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
 
   const previousTotalProducts: number = 10;
   const previousTotalCategories: number = 1400;
+  const apiUrl = import.meta.env.VITE_API_URL;
 
+  // --- 🔸 Fetch Data (Products) ---
   useEffect(() => {
-    fetch("http://localhost:8081/total_products")
+    fetch(`${apiUrl}/total_products`)
       .then((res) => res.json())
       .then((data) => {
         if (typeof data.totalProducts === "number") {
           setTotalProducts(data.totalProducts);
           const current = data.totalProducts;
           const prev = previousTotalProducts;
-
-          let changePercent = 0;
-          let type: "up" | "down" = "up";
-
-          if (prev === 0) {
-            changePercent = 100;
-            type = "up";
-          } else {
-            changePercent = ((current - prev) / prev) * 100;
-            type = changePercent >= 0 ? "up" : "down";
-          }
-
+          let changePercent = ((current - prev) / prev) * 100;
+          const type = changePercent >= 0 ? "up" : "down";
           const formattedChange = `${
             type === "up" ? "+" : ""
           }${changePercent.toFixed(1)}%`;
-
-          setChangeData({
-            change: formattedChange,
-            changeType: type,
-          });
+          setChangeData({ change: formattedChange, changeType: type });
         } else {
           setTotalProducts(null);
-          setChangeData({ change: "N/A", changeType: "down" });
         }
       })
       .catch(() => {
         setTotalProducts(null);
-        setChangeData({ change: "N/A", changeType: "down" });
       });
-  }, []);
+  }, [dates]); // ✅ refetch when date changes
 
+  // --- 🔸 Fetch Data (Categories) ---
   useEffect(() => {
-    fetch("http://localhost:8081/total_categories")
+    fetch(`${apiUrl}/total_categories`)
       .then((res) => res.json())
       .then((data) => {
         if (typeof data.totalCategories === "number") {
           setTotalCategories(data.totalCategories);
           const current = data.totalCategories;
           const prev = previousTotalCategories;
-
-          let changePercent = 0;
-          let type: "up" | "down" = "up";
-
-          if (prev === 0) {
-            changePercent = 100;
-            type = "up";
-          } else {
-            changePercent = ((current - prev) / prev) * 100;
-            type = changePercent >= 0 ? "up" : "down";
-          }
-
+          let changePercent = ((current - prev) / prev) * 100;
+          const type = changePercent >= 0 ? "up" : "down";
           const formattedChange = `${
             type === "up" ? "+" : ""
           }${changePercent.toFixed(1)}%`;
-
           setCategoriesChangeData({
             change: formattedChange,
             changeType: type,
           });
         } else {
           setTotalCategories(null);
-          setCategoriesChangeData({ change: "N/A", changeType: "down" });
         }
       })
       .catch(() => {
         setTotalCategories(null);
-        setCategoriesChangeData({ change: "N/A", changeType: "down" });
       });
-  }, []);
+  }, [dates]); // ✅ refetch when date changes
 
+  // --- 🔸 Fetch Data (Categories Modal) ---
   useEffect(() => {
     if (isCategoriesModalVisible) {
-      fetch("http://localhost:8081/categories_list")
+      fetch(`${apiUrl}/categories_list`)
         .then((res) => res.json())
         .then((data) => {
-          if (Array.isArray(data.categories)) {
+          if (Array.isArray(data.categories))
             setCategoriesList(data.categories);
-          } else {
-            setCategoriesList([]);
-          }
+          else setCategoriesList([]);
         })
         .catch(() => setCategoriesList([]));
     }
   }, [isCategoriesModalVisible]);
+
+  // --- 🔸 Filter Handlers ---
+  const showModal = () => setIsModalOpen(true);
+  const handleCancel = () => setIsModalOpen(false);
+
+  const handleApply = () => {
+    if (startDate && endDate && startDate.isAfter(endDate)) {
+      message.error("Start date cannot be after end date!");
+      return;
+    }
+    setDates([startDate, endDate]);
+    setIsModalOpen(false);
+  };
+
+  const handleReset = () => {
+    const resetStart = firstDayOfMonth;
+    const resetEnd = today;
+    setStartDate(resetStart);
+    setEndDate(resetEnd);
+    setDates([resetStart, resetEnd]);
+    setIsModalOpen(false);
+  };
+
+  const openProductsModal = () => setIsProductsModalVisible(true);
+  const closeProductsModal = () => setIsProductsModalVisible(false);
+  const openCategoriesModal = () => setIsCategoriesModalVisible(true);
+  const closeCategoriesModal = () => setIsCategoriesModalVisible(false);
 
   const formattedTotalProducts =
     totalProducts !== null ? `${totalProducts.toLocaleString()}` : "...";
@@ -180,7 +179,6 @@ const AdminDashboard = () => {
       link: "view more",
       onClick: openCategoriesModal,
     },
-
     {
       title: "Total Sales",
       value: "$18,645",
@@ -199,7 +197,6 @@ const AdminDashboard = () => {
       changeType: "up",
       link: "view more",
     },
-
     {
       title: "Total Expenses",
       value: "$73,579",
@@ -212,111 +209,163 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div className="space-y-6 bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white p-4">
-      <h1 className="text-lg font-semibold">Dashboard</h1>
+    <div
+      className="space-y-6 
+    bg-white dark:bg-[rgb(0,51,102)] text-black dark:text-white
+    p-0 rounded-none w-full
+    sm:p-4 sm:rounded-xl"
+    >
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
+        <h1 className="text-lg font-semibold">Dashboard</h1>
 
-      <div className="bg-white dark:bg-[#1e293b] flex flex-wrap justify-center gap-6 p-6 rounded-lg shadow-md">
-        {totalProducts === null || totalCategories === null
-          ? [...Array(5)].map((_, index) => (
-              <div
-                key={index}
-                className="animate-pulse rounded-2xl bg-white dark:bg-[rgb(0,51,102)] p-4 flex-1 min-w-[200px] max-w-[250px] shadow-md"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-1/2" />
-                    <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4" />
-                  </div>
-                  <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-md" />
-                </div>
-                <div className="flex justify-between items-center mt-6">
-                  <div className="h-3 w-10 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                  <div className="h-3 w-14 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                </div>
-              </div>
-            ))
-          : cardData.map((card, index) => (
-              <div
-                key={index}
-                className="group rounded-2xl bg-white dark:bg-[rgb(0,51,102)] p-4 flex-1 min-w-[200px] max-w-[250px] shadow-md hover:bg-[rgb(0,51,102)] dark:hover:bg-[rgb(0,41,82)] transition-colors duration-300"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="font-bold">
-                    <h1 className="capitalize text-sm font-medium text-gray-500 group-hover:text-white dark:text-white">
-                      {card.title}
-                    </h1>
-                    <p className="text-2xl font-semibold my-4 group-hover:text-white dark:text-white">
-                      {card.value}
-                    </p>
-                  </div>
-                  <div
-                    className={`text-3xl ${card.color} bg-gray-100 dark:bg-transparent p-4 rounded-md group-hover:bg-transparent group-hover:text-white dark:text-white transition-colors`}
-                  >
-                    {card.icon}
-                  </div>
-                </div>
-                <div className="flex justify-between items-center mt-4">
-                  <p
-                    className={`text-[10px] px-2 py-1 rounded-full ${
-                      card.changeType === "up"
-                        ? "text-green-500"
-                        : "text-red-500"
-                    } group-hover:text-white dark:text-white`}
-                  >
-                    {card.change}
-                  </p>
-                  {card.onClick ? (
-                    <button
-                      className="px-2 py-1 rounded-full text-green-600 group-hover:text-white dark:text-white"
-                      onClick={card.onClick}
-                    >
-                      {card.link}
-                    </button>
-                  ) : (
-                    <a
-                      href="#"
-                      className="px-2 py-1 rounded-full text-green-600 group-hover:text-white dark:text-white"
-                    >
-                      {card.link}
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+        {/* 🔸 Unified Filter Modal Button */}
+        <Button
+          type="default"
+          onClick={showModal}
+          className="flex items-center gap-2"
+        >
+          <FiFilter className="text-orange-500" />
+          <span className="font-medium">Filter - </span>
+          {dates[0]?.format("MMM DD, YYYY")} →{" "}
+          {dates[1]?.format("MMM DD, YYYY")}
+        </Button>
+
+        <Modal
+          open={isModalOpen}
+          footer={null}
+          onCancel={handleCancel}
+          centered
+        >
+          <div className="flex items-center gap-2 mb-4 text-lg font-semibold">
+            <FiCalendar className="text-orange-500" />
+            <span>Filter by Date</span>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="border px-3 py-1 rounded-md">
+              {dates[0] ? dates[0].format("MMM DD") : "Start"}
+            </div>
+            <AiOutlineArrowRight className="text-xl text-gray-500" />
+            <div className="border px-3 py-1 rounded-md">
+              {dates[1] ? dates[1].format("MMM DD") : "End"}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-between gap-4">
+            <div className="flex-1">
+              <label className="block mb-1 text-gray-600 text-sm">
+                Start Date
+              </label>
+              <DatePicker
+                value={startDate}
+                onChange={(val: Dayjs | null) => {
+                  setStartDate(val);
+                  setDates([val, endDate]);
+                }}
+                format="MMM DD, YYYY"
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            <div className="flex-1">
+              <label className="block mb-1 text-gray-600 text-sm">
+                End Date
+              </label>
+              <DatePicker
+                value={endDate}
+                onChange={(val: Dayjs | null) => {
+                  setEndDate(val);
+                  setDates([startDate, val]);
+                }}
+                format="MMM DD, YYYY"
+                style={{ width: "100%" }}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button onClick={handleCancel}>Cancel</Button>
+            <Button type="primary" onClick={handleApply}>
+              Apply
+            </Button>
+            <Button onClick={handleReset}>Reset</Button>
+          </div>
+        </Modal>
       </div>
 
+      {/* 🔸 Cards */}
+      <div className="bg-white dark:bg-[#1e293b] flex flex-wrap justify-center gap-6 p-6 rounded-lg shadow-md">
+        {cardData.map((card, index) => (
+          <div
+            key={index}
+            className="group rounded-2xl bg-white dark:bg-[rgb(0,51,102)] p-4 flex-1 min-w-[200px] max-w-[250px] shadow-md hover:bg-[rgb(0,51,102)] dark:hover:bg-[rgb(0,41,82)] transition-colors duration-300"
+          >
+            <div className="flex justify-between items-center">
+              <div className="font-bold">
+                <h1 className="capitalize text-sm font-medium text-gray-500 group-hover:text-white dark:text-white">
+                  {card.title}
+                </h1>
+                <p className="text-2xl font-semibold my-4 group-hover:text-white dark:text-white">
+                  {card.value}
+                </p>
+              </div>
+              <div
+                className={`text-3xl ${card.color} bg-gray-100 dark:bg-transparent p-4 rounded-md group-hover:bg-transparent group-hover:text-white dark:text-white transition-colors`}
+              >
+                {card.icon}
+              </div>
+            </div>
+            <div className="flex justify-between items-center mt-4">
+              <p
+                className={`text-[10px] px-2 py-1 rounded-full ${
+                  card.changeType === "up" ? "text-green-500" : "text-red-500"
+                } group-hover:text-white dark:text-white`}
+              >
+                {card.change}
+              </p>
+              {card.onClick ? (
+                <button
+                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-white dark:text-white"
+                  onClick={card.onClick}
+                >
+                  {card.link}
+                </button>
+              ) : (
+                <a
+                  href="#"
+                  className="px-2 py-1 rounded-full text-green-600 group-hover:text-white dark:text-white"
+                >
+                  {card.link}
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 🔸 Charts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
         {/* First row */}
-        <DailySalesChart />
-        <WeeklySalesChart />
-
-        {/* Second row */}
-        <MonthlySalesChart />
-        <YearlySalesChart />
-
-        {/* Third row */}
-        <TotalCustomersChart />
         <TopSellingProductsChart />
-        {/* Fourth row */}
-        <MostReservedTablesChart />
-        <div className="bg-white dark:bg-[#001f3f] rounded-lg shadow-lg w-full h-full p-6 flex flex-col transition-colors">
-          <TopSelling />
-        </div>
-        {/* Fifth row - make TopSelling span full width */}
+        <TopSelling />
+        {/* Second row */}
+        <TotalCustomersChart dates={dates} />
+        <MostReservedTablesChart dates={dates} />
       </div>
-      <div className="col-span-1 sm:col-span-2 bg-white dark:bg-[#001f3f] rounded-lg shadow-lg w-full h-full p-6 flex flex-col transition-colors">
-        <TotalRevenue />
-      </div>
+      {/* Full-width row */}
+      {/* 🔸 Revenue Section */}
+      <TotalRevenue dates={dates} />
 
+      {/* 🔸 Modals */}
       <TotalProductsModal
-        visible={isProductsModalVisible}
+        open={isProductsModalVisible}
         onClose={closeProductsModal}
         totalProducts={totalProducts}
         change={changeData.change}
       />
 
       <CategoriesModal
-        visible={isCategoriesModalVisible}
+        open={isCategoriesModalVisible}
         onClose={closeCategoriesModal}
         categories={categoriesList}
         totalCategories={totalCategories}
