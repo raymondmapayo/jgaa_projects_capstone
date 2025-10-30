@@ -72,23 +72,17 @@ const Reservation = () => {
       setPhone(storedPhone || "");
       setIsAuthenticated(true);
 
-      // ✅ Show ReservationTermsConditionModal if user hasn't accepted yet
       const termsAccepted = sessionStorage.getItem(
         "reservation_terms_accepted"
       );
-      if (!termsAccepted) {
-        setIsTermsModalVisible(true); // <-- show modal
-      }
+      if (!termsAccepted) setIsTermsModalVisible(true);
+
+      fetchReservedTables(); // ✅ fetch immediately after confirming authentication
     }
 
-    const today = new Date();
-    const todayDate = today.toISOString().split("T")[0];
-    setReservationDate(todayDate);
-
-    if (isAuthenticated) {
-      fetchReservedTables();
-    }
-  }, [isAuthenticated]);
+    const today = new Date().toISOString().split("T")[0];
+    setReservationDate(today);
+  }, []);
 
   // ✅ Automatically check open/close time using dayjs (no backend reset)
   useEffect(() => {
