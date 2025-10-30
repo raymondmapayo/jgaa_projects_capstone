@@ -2986,17 +2986,16 @@ app.get("/get_cart/:user_id", (req, res) => {
 // Backend endpoint to create an order
 // @ts-ignore
 app.post("/create_order/:user_id", (req, res) => {
-  const userId = req.params.user_id; // Get user_id from the URL
+  const userId = req.params.user_id; // Get user_id from URL
   const orderData = req.body.orderData; // Array of order items
-  const paymentMethod = req.body.payment_method || "pending";
 
   if (!orderData || orderData.length === 0) {
     return res.status(400).json({ error: "No order data provided" });
   }
 
-  console.log("Received order:", { userId, orderData, paymentMethod });
+  console.log("Received order:", { userId, orderData });
 
-  // Fetch user information (fname, lname, profile_pic) using user_id
+  // Fetch user information
   const fetchUserSql = "SELECT * FROM user_tbl WHERE user_id = ?";
   db.query(fetchUserSql, [userId], (userError, userResults) => {
     if (userError) {
@@ -3011,45 +3010,31 @@ app.post("/create_order/:user_id", (req, res) => {
     }
 
     const user = userResults[0];
-    const fname = user.fname;
-    const lname = user.lname;
-    const profile_pic = user.profile_pic;
+    const { fname, lname, profile_pic } = user;
 
-    const orderItemsWithCategoriesId = []; // Removed TypeScript annotation
+    const orderItemsWithCategoriesId = []; // ✅ Fixed: removed TypeScript annotation
 
-    // Loop through the orderData to fetch categories_id for each item
+    // Fetch categories_id for each item
     const fetchCategoryPromises = orderData.map((item) => {
       return new Promise((resolve, reject) => {
-        const fetchCategorySql =
-          "SELECT categories_id FROM categories_tbl WHERE LOWER(categories_name) = LOWER(?) LIMIT 1";
+        const fetchCategorySql = `
+          SELECT categories_id FROM categories_tbl 
+          WHERE LOWER(categories_name) = LOWER(?) LIMIT 1
+        `;
         db.query(
           fetchCategorySql,
           [item.categories_name || "Uncategorized"],
           (categoryErr, categoryResults) => {
-            if (categoryErr) {
-              return reject(categoryErr); // Reject promise on error
-            }
+            if (categoryErr) return reject(categoryErr);
 
-            let categoriesId = 0;
-            let categoriesName = item.categories_name || "Uncategorized";
+            const categoriesId =
+              categoryResults.length > 0 ? categoryResults[0].categories_id : 0;
+            const categoriesName = item.categories_name || "Uncategorized";
 
-            if (categoryResults.length > 0) {
-              categoriesId = categoryResults[0].categories_id;
-            } else {
-              console.warn(
-                `Category not found for "${categoriesName}", using default 0`
-              );
-            }
-
-            // Add item data with categories_id to orderItemsWithCategoriesId
             orderItemsWithCategoriesId.push({
-              item_name: item.item_name,
-              quantity: item.quantity,
-              price: item.price,
-              menu_img: item.menu_img,
-              final_total: item.final_total,
-              categories_name: categoriesName,
+              ...item,
               categories_id: categoriesId,
+              categories_name: categoriesName,
             });
 
             resolve(true);
@@ -3058,19 +3043,10 @@ app.post("/create_order/:user_id", (req, res) => {
       });
     });
 
-    // Wait for all category fetch queries to complete
     Promise.all(fetchCategoryPromises)
       .then(() => {
-        const categories = [
-          ...new Set(
-            orderItemsWithCategoriesId.map((item) => item.categories_name)
-          ),
-        ].join(", ");
-        const categoriesIds = [
-          ...new Set(
-            orderItemsWithCategoriesId.map((item) => item.categories_id)
-          ),
-        ].join(",");
+        // Pick first item’s category for order_tbl
+        const firstCategory = orderItemsWithCategoriesId[0];
 
         const insertOrderSql = `
           INSERT INTO order_tbl 
@@ -3078,20 +3054,19 @@ app.post("/create_order/:user_id", (req, res) => {
           VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
-        // Insert order data
         db.query(
           insertOrderSql,
           [
             userId,
-            paymentMethod === "PayPal" ? "paid" : "pending",
+            "pending", // Always pending because only GCash
             "processing",
             "Order",
             "Order is being processed",
             fname,
             lname,
             profile_pic,
-            categories,
-            categoriesIds,
+            firstCategory.categories_name,
+            firstCategory.categories_id,
           ],
           (orderErr, orderResult) => {
             if (orderErr) {
@@ -3101,12 +3076,10 @@ app.post("/create_order/:user_id", (req, res) => {
                 .json({ error: "Error placing order", details: orderErr });
             }
 
-            const orderId = orderResult.insertId; // Get the order_id from the insert
+            const orderId = orderResult.insertId;
             console.log(
               `Order ${orderId} created successfully for user ${userId}`
             );
-
-            // Return the orderId to the frontend
             res
               .status(200)
               .json({ message: "Order placed successfully", orderId });
