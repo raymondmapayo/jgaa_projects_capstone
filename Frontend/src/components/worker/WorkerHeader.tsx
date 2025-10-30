@@ -143,32 +143,45 @@ const WorkerHeader = ({ onMenuToggle }: { onMenuToggle: () => void }) => {
   // Fetch notifications when the component mounts
   const apiUrl = import.meta.env.VITE_API_URL;
   useEffect(() => {
-    setLoading(true); // Optional: if you're tracking loading state
+    let isMounted = true;
+    let isFetching = false; // prevent overlapping fetch calls
 
     const fetchNotifications = async () => {
+      if (isFetching) return; // skip if already fetching
+      isFetching = true;
+
       try {
         const response = await axios.get(
           `${apiUrl}/get_notifications_for_worker/${workerId}`
         );
         const data = response.data;
-        setNotifications(data);
-        setUnreadCount(
-          data.filter(
-            (notification: Notification) => notification.status === "unread"
-          ).length
-        );
+
+        if (isMounted) {
+          setNotifications(data);
+          setUnreadCount(
+            data.filter((n: Notification) => n.status === "unread").length
+          );
+        }
       } catch (error) {
         console.error("Error fetching notifications:", error);
       } finally {
-        setLoading(false); // Optional
+        isFetching = false;
+        if (isMounted) setLoading(false);
       }
     };
 
+    // initial fetch
+    setLoading(true);
     fetchNotifications();
 
-    const interval = setInterval(fetchNotifications, 1000);
+    // fetch every 5 seconds (real-time style)
+    const intervalId = setInterval(fetchNotifications, 5000);
 
-    return () => clearInterval(interval);
+    // cleanup
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, [workerId]);
 
   const handleWorkerLogout = async () => {

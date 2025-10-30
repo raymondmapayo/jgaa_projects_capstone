@@ -6,42 +6,62 @@ import {
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Input, Menu, Modal, Table, Tooltip } from "antd";
+import { Button, Dropdown, Input, Modal, Table, Tooltip } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import AddCategories from "../../components/form/AddCategories";
-import Archive from "./AdminModals/Archive";
-import CategoriesEditModal from "./AdminModals/CategoriesEditModal";
 
+import Archive from "../AdminModals/Archive";
+import CategoriesEdit from "../AdminModals/CategoriesEditModal";
+
+// ====================== Styled Components ======================
 const StyledContainer = styled.div`
+  width: 100%;
   background-color: #fff;
   border-radius: 12px;
-  padding: 16px;
+  padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
-  transition: background-color 0.3s;
+  transition: background-color 0.3s ease;
+  margin: 0 auto;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
+
+  /* ===== Mobile full-stretch ===== */
+  @media (max-width: 1024px) {
+    border-radius: 0;
+    box-shadow: none;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    padding: 16px;
+  }
 `;
 
 const StyledTable = styled(Table)`
+  width: 100%;
+  .ant-table {
+    width: 100%;
+  }
+
   .ant-table-thead > tr > th {
     background: #f9fafb;
     font-weight: bold;
     color: #374151;
   }
-  .ant-table {
-    border-radius: 8px;
-  }
+
   tr:hover td {
     background-color: #f9fafb !important;
   }
-  @media (max-width: 768px) {
-    .ant-table {
-      font-size: 13px;
+
+  /* Make table responsive on smaller screens */
+  @media (max-width: 1024px) {
+    font-size: 13px;
+    .ant-table-content {
+      overflow-x: auto;
     }
   }
 `;
@@ -56,6 +76,7 @@ const ActionButton = styled(Button)`
     transform: scale(1.05);
   }
 `;
+
 interface CategoryItem {
   key: string;
   categories_name: string;
@@ -65,7 +86,7 @@ interface CategoryItem {
   categories_id: number;
 }
 
-const AdminManageCategories = () => {
+const ManageCategories = () => {
   const [dataSource, setDataSource] = useState<CategoryItem[]>([]);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -79,33 +100,41 @@ const AdminManageCategories = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentMenus = dataSource.slice(indexOfFirstItem, indexOfLastItem);
   const [isArchivedModalVisible, setIsArchivedModalVisible] = useState(false);
+  const apiUrl = import.meta.env.VITE_API_URL;
+  const sortMenuItems = [
+    { key: "1", label: "Sort by Date" },
+    { key: "2", label: "Sort by Name" },
+  ];
 
   // Polling function to fetch updated categories
   useEffect(() => {
+    let isMounted = true;
+
     const fetchCategories = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:8081/get_categories"
-        );
-        setDataSource(response.data);
+        const response = await axios.get(`${apiUrl}/get_categories`, {
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (isMounted) setDataSource(response.data);
       } catch (error) {
         console.error("Error fetching categories:", error);
       } finally {
-        setIsLoading(false); // Set loading to false once the data fetch is complete
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchCategories();
+    const interval = setInterval(fetchCategories, 10000);
 
-    // Poll every 10 seconds
-    const interval = setInterval(fetchCategories, 10);
-
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, []);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [apiUrl]);
 
   const handleAddCategory = async () => {
     try {
-      const response = await axios.get("http://localhost:8081/get_categories");
+      const response = await axios.get(`${apiUrl}/get_categories`);
       setDataSource(response.data);
       setIsAddModalVisible(false);
     } catch (error) {
@@ -118,14 +147,17 @@ const AdminManageCategories = () => {
     setIsEditModalVisible(true);
   };
 
-  const handleSaveEdit = (updatedCategory: Partial<CategoryItem>) => {
+  const handleSaveEdit = (updatedCategory: CategoryItem) => {
     setDataSource((prevData) =>
-      prevData.map((category) =>
-        category.categories_id === updatedCategory.categories_id
-          ? { ...category, ...updatedCategory }
-          : category
+      prevData.map((cat) =>
+        cat.categories_id === updatedCategory.categories_id
+          ? updatedCategory
+          : cat
       )
     );
+
+    // Optional: reset to first page to ensure updated item is visible
+    setCurrentPage(1);
   };
 
   const handleViewDetails = (record: any) => {
@@ -149,15 +181,11 @@ const AdminManageCategories = () => {
           );
 
           // Perform actual archive operation
-          await axios.delete(
-            `http://localhost:8081/categories/${categories_id}`
-          );
+          await axios.delete(`${apiUrl}/categories/${categories_id}`);
         } catch (error) {
           console.error("Error archiving category:", error);
           // Re-fetch categories on error to restore previous state
-          const response = await axios.get(
-            "http://localhost:8081/get_categories"
-          );
+          const response = await axios.get(`${apiUrl}/get_categories`);
           setDataSource(response.data);
         }
       },
@@ -174,17 +202,32 @@ const AdminManageCategories = () => {
       title: "Category Name",
       dataIndex: "categories_name",
       key: "categories_name",
-      render: (text: any, record: any) => (
-        <div className="flex items-center gap-3">
-          <img
-            src={`http://localhost:8081/uploads/images/${record.categories_img}`}
-            alt={record.categories_name}
-            className="w-10 h-10 rounded object-cover flex-shrink-0"
-          />
-          <span className="text-sm sm:text-base">{text}</span>
-        </div>
-      ),
+      render: (text: any, record: any) => {
+        // ✅ Handle Cloudinary and local images properly
+        const imageUrl =
+          record.categories_img && record.categories_img.startsWith("http")
+            ? record.categories_img // full Cloudinary URL
+            : record.categories_img
+            ? `${apiUrl}/uploads/images/${record.categories_img}` // local fallback
+            : "https://via.placeholder.com/60x40?text=No+Image"; // placeholder
+
+        return (
+          <div className="flex items-center gap-3">
+            <img
+              src={imageUrl}
+              alt={record.categories_name}
+              className="w-10 h-10 rounded object-cover flex-shrink-0 border border-gray-200"
+              onError={(e) =>
+                (e.currentTarget.src =
+                  "https://via.placeholder.com/60x40?text=No+Image")
+              }
+            />
+            <span className="text-sm sm:text-base">{text}</span>
+          </div>
+        );
+      },
     },
+
     {
       title: "Description",
       dataIndex: "description",
@@ -293,15 +336,7 @@ const AdminManageCategories = () => {
             </Button>
 
             {/* Sort */}
-            <Dropdown
-              overlay={
-                <Menu>
-                  <Menu.Item key="1">Sort by Date</Menu.Item>
-                  <Menu.Item key="2">Sort by Name</Menu.Item>
-                </Menu>
-              }
-              trigger={["click"]}
-            >
+            <Dropdown menu={{ items: sortMenuItems }} placement="bottomLeft">
               <Button
                 icon={<FilterOutlined />}
                 className="w-full sm:w-[170px] px-3 py-1.5 text-center"
@@ -356,7 +391,7 @@ const AdminManageCategories = () => {
         )}
       </Modal>
 
-      <CategoriesEditModal
+      <CategoriesEdit
         isEditModalVisible={isEditModalVisible}
         setIsEditModalVisible={setIsEditModalVisible}
         selectedItem={selectedItem}
@@ -376,4 +411,4 @@ const AdminManageCategories = () => {
   );
 };
 
-export default AdminManageCategories;
+export default ManageCategories;

@@ -16,12 +16,11 @@ import React, { useEffect, useState } from "react";
 
 interface MenuItem {
   key: string;
-  menu_id: number; // Add menu_id to identify the item uniquely
+  menu_id: number;
   item_name: string;
   category: string;
   price: string;
-  description: string; // Added description field
-
+  description: string;
   menu_img: string;
   availability: string;
 }
@@ -30,7 +29,7 @@ interface MenuEditModalProps {
   isVisible: boolean;
   selectedItem: MenuItem | null;
   onClose: () => void;
-  onSave: (values: MenuItem) => void; // onSave expects the updated menu item
+  onSave: (values: MenuItem) => void;
 }
 
 const MenuEditModal: React.FC<MenuEditModalProps> = ({
@@ -40,9 +39,9 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
   onSave,
 }) => {
   const [uploading, setUploading] = useState(false);
-  const [form] = Form.useForm(); // Declare form instance
+  const [form] = Form.useForm();
+  const apiUrl = import.meta.env.VITE_API_URL;
 
-  // Re-fetch category data when selectedItem changes
   useEffect(() => {
     if (selectedItem) {
       form.setFieldsValue({
@@ -50,7 +49,6 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
         description: selectedItem.description,
         menu_img: selectedItem.menu_img,
         price: selectedItem.price,
-
         availability: selectedItem.availability,
       });
     }
@@ -62,41 +60,42 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
     const formData = new FormData();
     formData.append("item_name", values.item_name || selectedItem?.item_name);
     formData.append("price", values.price || selectedItem?.price);
-
     formData.append("availability", selectedItem?.availability || "Available");
     formData.append(
       "description",
       values.description || selectedItem?.description
     );
 
-    // Check if a new image is uploaded
+    const created_by = sessionStorage.getItem("user_id");
+    if (created_by) {
+      formData.append("created_by", created_by);
+    }
+
     if (values.menu_img?.fileList?.[0]?.originFileObj) {
       formData.append("menu_img", values.menu_img.fileList[0].originFileObj);
-    } else {
-      formData.append("menu_img", selectedItem?.menu_img || "");
     }
 
     try {
       const response = await axios.put(
-        `http://localhost:8081/update_menu/${selectedItem?.menu_id}`,
+        `${apiUrl}/update_menu/${selectedItem?.menu_id}`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
 
-      if (response.data === "Menu item updated successfully") {
+      console.log("Update response:", response.data);
+
+      if (response.data.success) {
         notification.success({
           message: "Success",
           description: "Menu item has been updated successfully!",
         });
 
-        // Directly call the handler to update the table without a refresh
-        onSave({
-          ...selectedItem,
-          ...values, // Merge updated values
-          menu_img:
-            values.menu_img?.fileList?.[0]?.originFileObj?.name ||
-            selectedItem?.menu_img,
-        });
+        // ✅ Get updated menu directly from backend
+        const updatedMenu = response.data.updatedMenu;
+
+        if (updatedMenu) {
+          onSave(updatedMenu); // instantly update parent list
+        }
 
         form.resetFields();
         onClose();
@@ -132,12 +131,12 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
     >
       {selectedItem && (
         <Form
-          form={form} // Pass the form instance to the Form
-          initialValues={selectedItem} // Ensure `initialValues` is correctly set from the selected item
+          form={form}
+          initialValues={selectedItem}
           onFinish={handleFinish}
           layout="vertical"
         >
-          {/* Existing Image - Positioned at the top and centered */}
+          {/* Existing Image */}
           {selectedItem.menu_img && (
             <Row justify="center">
               <Col
@@ -157,7 +156,11 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
                 <Image
                   width="100%"
                   height="100%"
-                  src={`http://localhost:8081/uploads/images/${selectedItem.menu_img}`}
+                  src={
+                    selectedItem.menu_img?.startsWith("http")
+                      ? selectedItem.menu_img // Cloudinary full URL
+                      : `${apiUrl}/uploads/images/${selectedItem.menu_img}` // Local fallback
+                  }
                   alt="Existing Menu Image"
                   style={{ objectFit: "cover" }}
                 />
@@ -171,7 +174,6 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
             </Row>
           )}
 
-          {/* Food Name, Price, and Quantity Inputs */}
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
@@ -193,14 +195,14 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
               </Form.Item>
             </Col>
           </Row>
-          {/* Menu Image Upload */}
+
           <Row justify="center" style={{ marginBottom: 20 }}>
             <Col>
               <Form.Item
                 label="Menu Image"
                 name="menu_img"
                 extra="Upload a new image"
-                style={{ textAlign: "center" }} // optional, aligns label center
+                style={{ textAlign: "center" }}
               >
                 <Upload
                   beforeUpload={(file) => {
@@ -232,8 +234,6 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
             </Col>
           </Row>
 
-          {/* Description Input */}
-
           <Form.Item label="Description" name="description">
             <Input.TextArea rows={3} />
           </Form.Item>
@@ -246,7 +246,6 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({
             </Row>
           )}
 
-          {/* Action Buttons */}
           <div className="flex justify-end gap-2">
             <Button onClick={onClose}>Cancel</Button>
             <Button type="primary" htmlType="submit">

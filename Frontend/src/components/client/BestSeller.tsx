@@ -6,9 +6,11 @@ import { FaShoppingBag } from "react-icons/fa";
 import ProductInfo from "../../pages/client/ProductInfo";
 import { addToCart } from "../../zustand/store/store.provider"; // Importing addToCart from zustand store
 import { CustomRate } from "./Rate"; // Assuming this is the custom rate component
+import ClientsCommentsRated from "../../pages/ClientsModal/ClientsCommentsRated";
 
 // Define the interface for bestselling product
 interface BestsellerProduct {
+  bestseller_id?: number; // Optional in case it's not returned
   item_name: string;
   menu_img: string;
   price: number;
@@ -32,6 +34,8 @@ const Bestseller: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null); // Selected item for the modal
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
   const [bestselling, setBestselling] = useState<BestsellerProduct[]>([]); // Use the interface here
+  const [selectedMenuName, setSelectedMenuName] = useState<string>("");
+  const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL;
   // Show the modal when a menu item is clicked
   const handleViewMenuClick = (product: BestsellerProduct) => {
@@ -158,7 +162,22 @@ const Bestseller: React.FC = () => {
                     </div>
 
                     {/* Rating and Review Count */}
-                    <div className="font-core text-gray-600 mt-2">
+                    <div
+                      className="font-core text-gray-600 mt-2 cursor-pointer hover:text-orange-500"
+                      onClick={() => {
+                        if (product.rating_count > 0) {
+                          console.log(
+                            "Opening modal for:",
+                            product.item_name,
+                            "ID:",
+                            product.bestseller_id
+                          );
+
+                          setSelectedMenuName(product.item_name);
+                          setReviewsModalVisible(true);
+                        }
+                      }}
+                    >
                       <p>
                         {product.rating_count > 0
                           ? `${product.rating_count} reviews`
@@ -199,7 +218,12 @@ const Bestseller: React.FC = () => {
                 </div>
               </motion.div>
             ))}
-
+            {/* Reviews Modal */}
+            <ClientsCommentsRated
+              visible={reviewsModalVisible}
+              onCancel={() => setReviewsModalVisible(false)}
+              menuName={selectedMenuName} // ✅ Use this
+            />
             {/* Modal */}
             <Modal
               open={modalVisible}

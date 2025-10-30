@@ -119,7 +119,7 @@ const MyPurchase = () => {
   };
 
   // Handle rating submission
-  const handleSubmitRating = () => {
+  const handleSubmitRating = (comments: string) => {
     if (selectedProduct) {
       const userId = sessionStorage.getItem("user_id"); // Get user_id from sessionStorage or other authentication method
       const data = {
@@ -132,6 +132,7 @@ const MyPurchase = () => {
         rating: ratingValue,
         order_quantity: selectedProduct.order_quantity, // Ensure this field is correctly set
         categories_name: selectedProduct.categories_name || "Uncategorized", // Use a default value if categories_name is not available
+        comments, // ✅ just a separate property
       };
 
       // Step 1: Submit data to the 'bestseller' table

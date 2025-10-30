@@ -6,6 +6,7 @@ import { FaShoppingBag } from "react-icons/fa";
 import { CustomRate } from "../../components/client/Rate";
 import { addToCart } from "../../zustand/store/store.provider"; // Importing addToCart from zustand store
 import ProductInfo from "./ProductInfo";
+import ClientsCommentsRated from "../ClientsModal/ClientsCommentsRated";
 // Define interface for bestselling product
 interface BestsellerProduct {
   bestseller_id?: number; // Optional in case it's not returned
@@ -31,6 +32,10 @@ const Bestseller: React.FC = () => {
   const [bestselling, setBestselling] = useState<BestsellerProduct[]>([]); // Use interface
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null); // Selected item for the modal
   const [modalVisible, setModalVisible] = useState(false); // Modal visibility state
+  const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
+
+  const [selectedMenuName, setSelectedMenuName] = useState<string>("");
+
   const apiUrl = import.meta.env.VITE_API_URL;
   // Show the modal when a menu item is clicked
   const handleViewMenuClick = (product: BestsellerProduct) => {
@@ -131,7 +136,7 @@ const Bestseller: React.FC = () => {
           bestselling.map((product) => (
             <motion.div
               key={product.item_name + product.menu_img}
-              className="bg-[#f4f6f8] cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center sm:flex sm:flex-row sm:items-center"
+              className="bg-[#fff7ec]  cursor-pointer border border-gray-200 rounded-lg shadow-lg overflow-hidden relative p-6 text-center sm:flex sm:flex-row sm:items-center"
               variants={cardVariants}
             >
               <div className="relative w-32 h-32 mx-auto mt-4">
@@ -159,9 +164,23 @@ const Bestseller: React.FC = () => {
                   <div className="flex justify-start text-yellow-500">
                     <CustomRate value={parseFloat(product.total_avg_rating)} />
                   </div>
+                  {/* Rating and Review Count */}
+                  <div
+                    className="font-core text-gray-600 mt-2 cursor-pointer hover:text-orange-500"
+                    onClick={() => {
+                      if (product.rating_count > 0) {
+                        console.log(
+                          "Opening modal for:",
+                          product.item_name,
+                          "ID:",
+                          product.bestseller_id
+                        );
 
-                  {/* Review Count */}
-                  <div className="font-core text-gray-600 mt-2">
+                        setSelectedMenuName(product.item_name);
+                        setReviewsModalVisible(true);
+                      }
+                    }}
+                  >
                     <p>
                       {product.rating_count > 0
                         ? `${product.rating_count} reviews`
@@ -213,6 +232,13 @@ const Bestseller: React.FC = () => {
             </p>
           </div>
         )}
+        {/* Reviews Modal */}
+        <ClientsCommentsRated
+          visible={reviewsModalVisible}
+          onCancel={() => setReviewsModalVisible(false)}
+          menuName={selectedMenuName} // ✅ Use this
+        />
+
         {/* Modal for Product Info */}
         <Modal
           open={modalVisible} // Modal visibility controlled by the state

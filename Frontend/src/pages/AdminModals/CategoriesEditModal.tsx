@@ -23,14 +23,14 @@ interface CategoryItem {
   categories_id: number;
 }
 
-interface CategoriesEditModalProps {
+interface CategoriesEditProps {
   isEditModalVisible: boolean;
   setIsEditModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   selectedItem: CategoryItem | null;
-  handleSaveEdit: (values: Partial<CategoryItem>) => void;
+  handleSaveEdit: (updatedCategory: CategoryItem) => void;
 }
 
-const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
+const CategoriesEdit: React.FC<CategoriesEditProps> = ({
   isEditModalVisible,
   setIsEditModalVisible,
   selectedItem,
@@ -38,76 +38,90 @@ const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [uploading, setUploading] = useState(false);
+  const [fileList, setFileList] = useState<any[]>([]);
+  const apiUrl = import.meta.env.VITE_API_URL;
 
-  // Re-fetch category data when selectedItem changes
   useEffect(() => {
     if (selectedItem) {
       form.setFieldsValue({
         categories_name: selectedItem.categories_name,
         description: selectedItem.description,
-        categories_img: selectedItem.categories_img,
       });
+      setFileList([]); // reset file list
     }
   }, [selectedItem, form]);
 
   const handleFinish = async (values: any) => {
-    console.log("Form Submitted:", values);
+    if (!selectedItem) return;
 
-    // FormData for API submission
     const formData = new FormData();
     formData.append(
       "categories_name",
-      values.categories_name || selectedItem?.categories_name
+      values.categories_name || selectedItem.categories_name
     );
     formData.append(
       "description",
-      values.description || selectedItem?.description
+      values.description || selectedItem.description
     );
-    formData.append("status", selectedItem?.status || "active");
+    formData.append("status", selectedItem.status || "active");
 
-    if (values.categories_img?.fileList?.[0]) {
-      formData.append(
-        "categories_img",
-        values.categories_img.fileList[0].originFileObj
-      );
-    } else {
-      formData.append("categories_img", selectedItem?.categories_img || "");
+    const created_by = sessionStorage.getItem("user_id");
+    if (created_by) formData.append("created_by", created_by);
+
+    if (fileList.length > 0 && fileList[0].originFileObj) {
+      formData.append("categories_img", fileList[0].originFileObj);
     }
 
     try {
-      // Send the update request to the backend
       const response = await axios.put(
-        `http://localhost:8081/update_categories/${selectedItem?.categories_id}`,
+        `${apiUrl}/update_categories/${selectedItem.categories_id}`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
 
-      notification.success({
-        message: "Category Edited",
-        description: "Category details have been updated successfully!",
-      });
+      if (response.data.success) {
+        notification.success({
+          message: "Category Updated",
+          description: "Category details have been updated successfully!",
+        });
 
-      // Save the edited data to the parent component (callback)
-      handleSaveEdit(response.data as Partial<CategoryItem>);
+        // ✅ Pass the full updated category including id
+        const updatedCategory: CategoryItem = {
+          ...selectedItem,
+          ...values,
+          categories_img:
+            fileList[0]?.originFileObj?.name || selectedItem.categories_img,
+        };
 
-      // Close the modal and reset form
-      form.resetFields();
-      setIsEditModalVisible(false);
+        handleSaveEdit(updatedCategory);
+
+        form.resetFields();
+        setFileList([]);
+        setIsEditModalVisible(false);
+      } else {
+        notification.error({
+          message: "Error",
+          description: "Failed to update category. Please try again.",
+        });
+      }
     } catch (error) {
       console.error("Error editing category:", error);
       notification.error({
         message: "Error",
-        description: "Failed to edit category. Please try again later.",
+        description: "An error occurred while updating the category.",
       });
     }
   };
 
   const handleUploadChange = (info: any) => {
-    if (info.file.status === "uploading") {
-      setUploading(true);
-    } else if (info.file.status === "done" || info.file.status === "error") {
-      setUploading(false);
-    }
+    const latestFileList = info.fileList.slice(-1).map((file: any) => {
+      if (!file.url && !file.preview && file.originFileObj) {
+        file.preview = URL.createObjectURL(file.originFileObj);
+      }
+      return file;
+    });
+    setFileList(latestFileList);
+    setUploading(info.file.status === "uploading");
   };
 
   return (
@@ -121,9 +135,10 @@ const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
         <Form
           layout="vertical"
           form={form}
-          initialValues={selectedItem} // Automatically pre-fill the form with updated data
+          initialValues={selectedItem}
           onFinish={handleFinish}
         >
+          {/* Existing Image */}
           {selectedItem.categories_img && (
             <Row justify="center">
               <Col
@@ -143,7 +158,11 @@ const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
                 <Image
                   width="100%"
                   height="100%"
-                  src={`http://localhost:8081/uploads/images/${selectedItem.categories_img}`}
+                  src={
+                    selectedItem.categories_img.startsWith("http")
+                      ? selectedItem.categories_img
+                      : `${apiUrl}/uploads/images/${selectedItem.categories_img}`
+                  }
                   alt="Existing Category Image"
                   style={{ objectFit: "cover" }}
                 />
@@ -156,6 +175,7 @@ const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
               </Col>
             </Row>
           )}
+
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
@@ -168,18 +188,20 @@ const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
                 <Input />
               </Form.Item>
             </Col>
+
             <Col span={12}>
               <Form.Item
                 label="Category Image"
                 name="categories_img"
-                extra="Upload a new  image"
+                extra="Upload a new image (optional)"
               >
                 <Upload
                   beforeUpload={(file) => {
-                    const isValidType =
-                      file.type === "image/png" ||
-                      file.type === "image/jpeg" ||
-                      file.type === "image/jpg";
+                    const isValidType = [
+                      "image/png",
+                      "image/jpeg",
+                      "image/jpg",
+                    ].includes(file.type);
                     if (!isValidType) {
                       notification.error({
                         message: "Invalid File Type",
@@ -188,11 +210,12 @@ const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
                       });
                       return Upload.LIST_IGNORE;
                     }
-                    return false;
+                    return false; // manual upload
                   }}
+                  fileList={fileList}
+                  onChange={handleUploadChange}
                   maxCount={1}
                   listType="picture"
-                  onChange={handleUploadChange}
                 >
                   <Button icon={<UploadOutlined />}>
                     Upload New Category Image
@@ -232,4 +255,4 @@ const CategoriesEditModal: React.FC<CategoriesEditModalProps> = ({
   );
 };
 
-export default CategoriesEditModal;
+export default CategoriesEdit;

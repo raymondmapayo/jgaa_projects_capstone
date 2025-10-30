@@ -30,7 +30,7 @@ const Register = () => {
   return (
     <div className="flex flex-col md:flex-row h-screen">
       {/* Left Side: Branding/Image */}
-      <div className="hidden md:flex w-full md:w-1/2 bg-gradient-to-r from-sky-500 to-sky-700 text-white flex-col justify-center items-center p-12 rounded-r-3xl shadow-lg">
+      <div className="hidden md:flex w-full md:w-1/2 bg-gradient-to-r bg-[#fff7ec]  text-black flex-col justify-center items-center p-12 rounded-r-3xl shadow-lg">
         <h2 className="text-5xl font-extrabold text-center leading-snug drop-shadow-lg">
           JGAA Thai Restaurant
         </h2>
@@ -219,7 +219,7 @@ const Register = () => {
           </div>
 
           <p className="text-center mt-6 text-lg text-gray-500">
-            © 2024 Active, All Rights Reserved
+            © 2025 Active, All Rights Reserved
           </p>
         </div>
       </div>

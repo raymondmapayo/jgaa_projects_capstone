@@ -27,7 +27,7 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
   const [form] = Form.useForm();
   const [categoryList, setCategoryList] = useState<any[]>([]); // queue
   const [existingCategories, setExistingCategories] = useState<any[]>([]); // already in DB
-
+  const apiUrl = import.meta.env.VITE_API_URL;
   // Fetch categories when modal opens
   useEffect(() => {
     if (isAddModalVisible) {
@@ -37,9 +37,7 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:8081/get_supply_categories"
-      );
+      const response = await axios.get(`${apiUrl}/get_supply_categories`);
       setExistingCategories(response.data);
     } catch (error) {
       console.error("Error fetching supply categories:", error);
@@ -69,7 +67,7 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
 
     try {
       const response = await axios.post(
-        "http://localhost:8081/add_supply_category",
+        `${apiUrl}/add_supply_category`,
         values
       );
 
@@ -129,7 +127,7 @@ const AddSupplyCategories: React.FC<AddSupplyCategoriesProps> = ({
   const handleSubmitAll = async () => {
     try {
       for (const item of categoryList) {
-        await axios.post("http://localhost:8081/add_supply_category", item);
+        await axios.post(`${apiUrl}/add_supply_category`, item);
       }
       notification.success({
         message: "Supply Categories Added",

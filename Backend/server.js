@@ -13,8 +13,7 @@ const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 dotenv.config();
-const { sendConfirmationEmail } = require("./service/EmailService");
-const sgMail = require("@sendgrid/mail");
+//const { sendConfirmationEmail } = require("./service/SentEmail");
 
 const { upload } = require("./cloudinary");
 const app = express();
@@ -111,20 +110,6 @@ db.connect((err) => {
   if (err) console.error("❌ Database connection failed:", err);
   else console.log("✅ Connected to MySQL (Clever Cloud)");
 });
-
-// Ensure SMTP email is set
-const smtpEmail = process.env.SMTP_EMAIL;
-if (!smtpEmail) {
-  throw new Error("SMTP_EMAIL is not defined in environment variables.");
-}
-
-// Ensure the API_KEY is either a valid string or throw an error if undefined
-const API_KEY = process.env.SENDGRID_API_KEY || ""; // Fallback to empty string if undefined
-if (!API_KEY) {
-  throw new Error("SENDGRID_API_KEY is not defined");
-}
-
-sgMail.setApiKey(API_KEY);
 
 // Ensure that both client_id and client_secret are defined in the environment variables
 if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
@@ -265,17 +250,29 @@ app.put("/update_menu/:menu_id", upload.single("menu_img"), (req, res) => {
 //========================== MENUS ITEM  GET =========================================
 // @ts-ignore
 app.get("/menu_items", (request, response) => {
-  const sql = "SELECT * FROM menu_tbl";
+  const sql = `
+    SELECT 
+      menu_id,
+      categories_name,
+      item_name,
+      menu_img,
+      description,
+      price,
+      TRIM(availability) AS availability
+    FROM menu_tbl
+  `;
 
   db.query(sql, (error, data) => {
     if (error) {
       console.error("Error fetching items:", error);
       return response.status(500).json({ error: "Internal Server Error" });
     }
+
     console.log("Fetched items:", data);
     return response.json(data);
   });
 });
+
 //========================== MENUS ITEM END GET =======================================
 
 //========================== ADD CATEGORIES ===============================================
@@ -2268,6 +2265,7 @@ app.get("/get_clients_info", (req, res) => {
 
 // Send message from client to all workers
 // @ts-ignore
+// ✅ Send message to all workers
 app.post("/sendMessageToAllWorkers", (req, res) => {
   const { message, sender_id } = req.body;
 
@@ -2278,47 +2276,55 @@ app.post("/sendMessageToAllWorkers", (req, res) => {
   }
 
   const timestamp = new Date();
-  const sender_role = "client"; // Always client
-  const receiver_role = "worker"; // Always worker
+  const sender_role = "client";
+  const receiver_role = "worker";
 
-  // Fetch all workers from the database
+  // Fetch all workers
   db.query(
-    "SELECT user_id FROM user_tbl WHERE role = 'worker'",
-    (err, workerResult) => {
+    "SELECT user_id FROM user_tbl WHERE role = ?",
+    [receiver_role],
+    (err, workers) => {
       if (err) {
-        console.error("Failed to fetch workers:", err.message);
+        console.error("❌ Failed to fetch workers:", err.message);
         return res.status(500).json({ error: "Failed to fetch workers" });
       }
 
-      if (workerResult.length === 0) {
+      if (workers.length === 0) {
         return res.status(404).json({ error: "No workers found" });
       }
 
-      // Track the number of messages successfully sent
       let messagesSent = 0;
-      const totalWorkers = workerResult.length;
+      const totalWorkers = workers.length;
 
-      workerResult.forEach((worker) => {
+      workers.forEach((worker) => {
         const recipient_id = worker.user_id;
 
+        const insertSQL = `
+        INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, is_read, status, role)
+        VALUES (?, ?, ?, ?, ?, 'active', ?)
+      `;
+
         db.query(
-          "INSERT INTO message_tbl (message, sender_id, receiver_id, timestamp, is_read, status, role) VALUES (?, ?, ?, ?, ?, 'active', ?)",
+          insertSQL,
           [message, sender_id, recipient_id, timestamp, false, sender_role],
-          (err, result) => {
+          (err) => {
             if (err) {
-              console.error("Failed to send message:", err.message);
-              return res.status(500).json({ error: "Failed to send message" });
+              console.error(
+                `❌ Failed to send message to worker ${recipient_id}:`,
+                err.message
+              );
+              // Don't return here — continue processing others
+            } else {
+              console.log(`✅ Message sent to worker ID: ${recipient_id}`);
             }
 
-            console.log(`Message sent to worker ID: ${recipient_id}`);
-
-            // Increment messagesSent counter
             messagesSent++;
 
-            // Only send the response once all messages have been processed
+            // Send response only after all are processed
             if (messagesSent === totalWorkers) {
               return res.status(200).json({
                 message: "Messages sent to all workers successfully!",
+                totalSent: messagesSent,
               });
             }
           }
@@ -2328,37 +2334,45 @@ app.post("/sendMessageToAllWorkers", (req, res) => {
   );
 });
 
-// Get client-specific messages
+// ✅ Get client-specific messages (client side)
 app.get("/getClientMessages/:user_id", (req, res) => {
   const { user_id } = req.params;
+
   const sql = `
-    SELECT message_tbl.*, 
-    CASE WHEN sender_id = ? THEN 'client' ELSE 'worker' END AS sender
-    FROM message_tbl 
-    WHERE sender_id = ? OR receiver_id = ?
-    ORDER BY timestamp DESC
+    SELECT m.*, 
+    CASE WHEN m.sender_id = ? THEN 'client' ELSE 'worker' END AS sender
+    FROM message_tbl AS m
+    WHERE m.sender_id = ? OR m.receiver_id = ?
+    ORDER BY m.timestamp DESC
   `;
 
   db.query(sql, [user_id, user_id, user_id], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
+    if (err) {
+      console.error("❌ Failed to fetch client messages:", err.message);
+      return res.status(500).json({ error: "Failed to fetch client messages" });
+    }
+    res.status(200).json(results);
   });
 });
 
-// Get worker-specific messages
+// ✅ Get worker-specific messages (worker side)
 app.get("/getWorkerMessages/:user_id", (req, res) => {
   const { user_id } = req.params;
+
   const sql = `
-    SELECT message_tbl.*, 
-    CASE WHEN sender_id = ? THEN 'worker' ELSE 'client' END AS sender
-    FROM message_tbl 
-    WHERE receiver_id = ?
-    ORDER BY timestamp DESC
+    SELECT m.*, 
+    CASE WHEN m.sender_id = ? THEN 'worker' ELSE 'client' END AS sender
+    FROM message_tbl AS m
+    WHERE m.sender_id = ? OR m.receiver_id = ?
+    ORDER BY m.timestamp DESC
   `;
 
-  db.query(sql, [user_id, user_id], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
+  db.query(sql, [user_id, user_id, user_id], (err, results) => {
+    if (err) {
+      console.error("❌ Failed to fetch worker messages:", err.message);
+      return res.status(500).json({ error: "Failed to fetch worker messages" });
+    }
+    res.status(200).json(results);
   });
 });
 
@@ -2728,32 +2742,29 @@ app.get("/get_reservation", (req, res) => {
     return res.json(results);
   });
 });
+/*
+app.post("/send_reservation_email", async (req, res) => {
+  const { email, full_name, reservation_date, reservation_time, table, body } =
+    req.body;
 
-// Endpoint to send reservation confirmation email
-app.post("/send_reservation_email", (req, res) => {
-  const { email, full_name, body } = req.body;
-  const subject = "Confirmation of Reservation"; // Fixed subject
-  // Create the email message
-  const message = {
-    to: email, // Recipient's email from the request body
-    from: smtpEmail, // Sender's email from environment variable
-    subject: subject,
-    text: body,
-    html: `<strong>${body}</strong>`,
-  };
-
-  // Send the email using SendGrid
-  sgMail
-    .send(message)
-    .then(() => {
-      console.log("Email sent successfully!");
-      return res.json({ message: "Email sent successfully" });
-    })
-    .catch((error) => {
-      console.error("Error sending email:", error);
-      return res.status(500).json({ error: "Failed to send email" });
+  try {
+    await sendConfirmationEmail(
+      email,
+      full_name,
+      reservation_date,
+      reservation_time,
+      table,
+      body
+    );
+    res.json({
+      message: "✅ Reservation confirmation email sent successfully",
     });
+  } catch (error) {
+    console.error("❌ Failed to send reservation email:", error);
+    res.status(500).json({ error: "Failed to send email" });
+  }
 });
+*/
 
 app.post("/most_reserve", (req, res) => {
   const { table_id, reservation_date } = req.body;
@@ -3449,7 +3460,6 @@ app.post("/update_payment_status/:order_id", async (req, res) => {
   }
 });
 
-// ✅ Unit conversion helper
 function convertUnit(measurement, fromUnit, toUnit) {
   const unitMap = { g: 0.001, kg: 1, ml: 0.001, liter: 1, l: 1, piece: 1 };
   const fromFactor = unitMap[fromUnit.toLowerCase()] ?? 1;
@@ -3957,8 +3967,15 @@ app.get("/fetch_my_purchase/:user_id", async (req, res) => {
 //==========================  ORDER TRANSACT END  ============================
 // @ts-ignore
 app.post("/bestseller", (req, res) => {
-  const { user_id, item_name, menu_img, price, rating, order_quantity } =
-    req.body;
+  const {
+    user_id,
+    item_name,
+    menu_img,
+    price,
+    rating,
+    order_quantity,
+    comments, // new field
+  } = req.body;
 
   console.log("Received data:", {
     user_id,
@@ -3967,6 +3984,7 @@ app.post("/bestseller", (req, res) => {
     price,
     rating,
     order_quantity,
+    comments,
   });
 
   if (
@@ -4022,15 +4040,20 @@ app.post("/bestseller", (req, res) => {
           // Already rated → Update
           const existingRating = result[0].rating;
           const ratingCount = result[0].rating_count;
+          const oldComments = result[0].comments || "";
           const newTotalRating = existingRating + rating;
           const newRatingCount = ratingCount + 1;
           const avgRating = newTotalRating / newRatingCount;
 
           const updateQuery = `
             UPDATE bestseller_tbl
-            SET rating = ?, rating_count = ?, avg_rating = ?, order_quantity = ?, categories_name = ?
+            SET rating = ?, rating_count = ?, avg_rating = ?, order_quantity = ?, categories_name = ?, comments = ?
             WHERE order_item_id = ? AND user_id = ?
           `;
+
+          const combinedComments = oldComments
+            ? oldComments + "\n" + comments
+            : comments;
 
           db.query(
             updateQuery,
@@ -4040,6 +4063,7 @@ app.post("/bestseller", (req, res) => {
               avgRating.toFixed(2),
               order_quantity,
               categories_name,
+              combinedComments,
               order_item_id,
               user_id,
             ],
@@ -4053,7 +4077,7 @@ app.post("/bestseller", (req, res) => {
 
               console.log("Rating updated:", result);
               return res.status(200).json({
-                message: "Rating updated successfully",
+                message: "Rating and comments updated successfully",
                 avg_rating: avgRating.toFixed(2),
               });
             }
@@ -4062,8 +4086,8 @@ app.post("/bestseller", (req, res) => {
           // Not rated yet → Insert
           const insertQuery = `
             INSERT INTO bestseller_tbl 
-              (order_item_id, user_id, item_name, menu_img, price, rating, rating_count, avg_rating, rated, order_quantity, categories_name)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, true, ?, ?)
+              (order_item_id, user_id, item_name, menu_img, price, rating, rating_count, avg_rating, rated, order_quantity, categories_name, comments)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, true, ?, ?, ?)
           `;
 
           const avgRating = rating;
@@ -4080,6 +4104,7 @@ app.post("/bestseller", (req, res) => {
               avgRating,
               order_quantity,
               categories_name,
+              comments, // insert comments
             ],
             (err, result) => {
               if (err) {
@@ -4091,7 +4116,7 @@ app.post("/bestseller", (req, res) => {
 
               console.log("New product rating inserted:", result);
               return res.status(201).json({
-                message: "Rating submitted successfully",
+                message: "Rating and comment submitted successfully",
               });
             }
           );
@@ -4099,6 +4124,53 @@ app.post("/bestseller", (req, res) => {
       });
     }
   );
+});
+
+// ✅ Get bestseller reviews and total average rating dynamically by item_name
+
+// ✅ Fetch all reviews for a bestseller item
+app.get("/get_item_reviews/:item_name", async (req, res) => {
+  const { item_name } = req.params;
+
+  const query = `
+    SELECT 
+      u.fname,
+      u.lname,
+      u.email,
+      u.profile_pic,
+      b.created_at,
+      b.avg_rating,
+      b.item_name,
+      b.comments,
+      ROUND((
+        SELECT AVG(avg_rating)
+        FROM bestseller_tbl
+        WHERE item_name = ?
+      ), 1) AS total_avg_rating
+    FROM bestseller_tbl AS b
+    INNER JOIN user_tbl AS u ON b.user_id = u.user_id
+    WHERE b.item_name = ?
+    ORDER BY b.created_at DESC
+  `;
+
+  try {
+    const [rows] = await db.promise().query(query, [item_name, item_name]);
+
+    // Ensure total_avg_rating is a number
+    const results = rows.map((row) => ({
+      ...row,
+      total_avg_rating:
+        row.total_avg_rating !== null ? Number(row.total_avg_rating) : 0,
+      avg_rating: Number(row.avg_rating), // ensure avg_rating is number
+    }));
+
+    console.log("✅ Reviews fetched for Item:", item_name, results);
+
+    res.json(results);
+  } catch (err) {
+    console.error("❌ Error fetching item reviews:", err);
+    res.status(500).json({ error: "Error fetching item reviews" });
+  }
 });
 
 //==========================  TOP SELLING   ============================
@@ -5174,34 +5246,27 @@ app.get("/get_workers_read_and_unread", (req, res) => {
   });
 });
 // Get notifications for a specific client
-app.get("/notifications/:userId", (req, res) => {
-  const { userId } = req.params;
+app.get("/notifications/:user_id", (req, res) => {
+  const { user_id } = req.params;
 
-  console.log("Fetching notifications for User ID:", userId);
-
-  const query = `
-    SELECT 
-      client_notification_id,
-      message,
-      sender_id,
-      recipient_id,
-      created_at,
-      status
+  const sql = `
+    SELECT client_notification_id, message, sender_id, recipient_id, created_at, status
     FROM client_notification_tbl
     WHERE recipient_id = ?
     ORDER BY created_at DESC
   `;
 
-  db.query(query, [userId], (err, results) => {
+  db.query(sql, [user_id], (err, results) => {
     if (err) {
       console.error("Error fetching notifications:", err);
-      return res.status(500).json({ error: "Failed to fetch notifications" });
+      return res.status(500).json({ error: "Database error" });
     }
 
-    console.log("Notifications fetched successfully:", results);
+    // ✅ Always return an array of notifications
     res.json(results);
   });
 });
+
 // Mark a notification as read
 app.post("/notifications/read/:notificationId", (req, res) => {
   const { notificationId } = req.params;
@@ -5830,6 +5895,48 @@ app.put("/update_payment_status", (req, res) => {
       return res.status(500).json({ error: "Database error" });
     }
     res.json({ success: true });
+  });
+});
+
+// ✅ Get transaction validation by order_id
+app.get("/get_transac_validation/:order_id", (req, res) => {
+  const { order_id } = req.params;
+
+  // Safety check
+  if (!order_id || order_id === "undefined") {
+    console.error("❌ Invalid or missing order_id in request.");
+    return res.status(400).json({ error: "Invalid order ID." });
+  }
+
+  console.log("🔍 Fetching transaction for order_id:", order_id);
+
+  const sql = `
+    SELECT 
+      transaction_id,
+      amount,
+      reference_code,
+      gcash_number,
+      proof_image,
+      status,
+      payment_date,
+      payment_time
+    FROM transaction_tbl
+    WHERE order_id = ?;
+  `;
+
+  db.query(sql, [order_id], (error, results) => {
+    if (error) {
+      console.error("❌ SQL ERROR:", error.sqlMessage || error);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+
+    if (!results || results.length === 0) {
+      console.log("⚠️ No transaction found for order_id:", order_id);
+      return res.status(404).json({ message: "No transaction found." });
+    }
+
+    console.log("✅ Transaction fetched successfully:", results[0]);
+    res.json(results);
   });
 });
 

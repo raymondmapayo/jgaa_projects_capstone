@@ -21,25 +21,36 @@ const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
     ArchivedCategoryItem[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
-
+  const apiUrl = import.meta.env.VITE_API_URL;
   useEffect(() => {
+    let isMounted = true; // ✅ Prevent state updates on unmounted component
+
     const fetchArchivedCategories = async () => {
       try {
-        const response = await axios.get("http://localhost:8081/get_archived");
-        setArchivedCategories(response.data);
-        setIsLoading(false); // Set loading to false after data is fetched
+        const response = await axios.get(`${apiUrl}/get_archived`, {
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (isMounted) {
+          setArchivedCategories(response.data);
+        }
       } catch (error) {
         console.error("Error fetching archived categories:", error);
-        setIsLoading(false); // Set loading to false even if there is an error
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     };
 
-    fetchArchivedCategories();
+    fetchArchivedCategories(); // Initial load
 
-    // Polling every 10 seconds to refresh the archived categories
-    const interval = setInterval(fetchArchivedCategories, 10);
-    return () => clearInterval(interval);
-  }, []);
+    // ✅ Poll every 10 seconds (not 10 ms)
+    const interval = setInterval(fetchArchivedCategories, 10000);
+
+    // ✅ Cleanup on unmount
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [apiUrl]);
 
   const handleRestore = async (categories_id: number) => {
     Modal.confirm({
@@ -50,9 +61,7 @@ const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
       cancelText: "Cancel",
       onOk: async () => {
         try {
-          await axios.post(
-            `http://localhost:8081/restore_category/${categories_id}`
-          );
+          await axios.post(`${apiUrl}/restore_category/${categories_id}`);
           setArchivedCategories((prevData) =>
             prevData.filter((item) => item.categories_id !== categories_id)
           );
@@ -76,7 +85,7 @@ const Archive = ({ isArchivedModalVisible, onClose }: ArchiveProps) => {
       render: (text: any, record: any) => (
         <div className="flex items-center gap-3">
           <img
-            src={`http://localhost:8081/uploads/images/${record.categories_img}`}
+            src={`${apiUrl}/uploads/images/${record.categories_img}`}
             alt={record.categories_name}
             className="w-10 h-10 rounded"
           />

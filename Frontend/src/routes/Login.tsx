@@ -94,7 +94,7 @@ const Login = () => {
   return (
     <div className="flex flex-col md:flex-row h-screen">
       {/* Left Side: Branding/Image */}
-      <div className="hidden md:flex w-full md:w-1/2 bg-gradient-to-r from-sky-500 to-sky-700 text-white flex-col justify-center items-center p-12 rounded-r-3xl shadow-lg">
+      <div className="hidden md:flex w-full md:w-1/2 bg-gradient-to-r bg-[#fff7ec]  text-black flex-col justify-center items-center p-12 rounded-r-3xl shadow-lg">
         <h2 className="text-5xl font-extrabold text-center leading-snug drop-shadow-lg">
           JGAA Thai Restaurant
         </h2>
@@ -242,7 +242,7 @@ const Login = () => {
                 Sign In
               </Button>
             </Form.Item>
-            <div className="flex justify-center space-x-4">
+            <div className="flex justify-end space-x-4 w-full -mt-4 mb-4">
               <span
                 className="text-blue-600 cursor-pointer text-sm"
                 onClick={() => setIsForgotPasswordVisible(true)}

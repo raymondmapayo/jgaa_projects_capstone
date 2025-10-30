@@ -1,32 +1,35 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Button, Input, Tooltip, message as antdMessage } from "antd";
+import { Button, Input, Select, Tooltip, message as antdMessage } from "antd";
 import axios from "axios";
 import { useEffect, useState } from "react";
 
 const { TextArea } = Input;
+const { Option } = Select;
 
 interface EditValidationModalProps {
   order: any;
   onUpdateOrder?: (updatedOrder: any) => void;
 }
 const apiUrl = import.meta.env.VITE_API_URL;
-
 const EditValidationModal: React.FC<EditValidationModalProps> = ({
   order,
   onUpdateOrder,
 }) => {
-  const [message, setMessage] = useState<string>(
-    "Your GCash payment is verified"
-  );
-  const [paymentStatus, setPaymentStatus] = useState<string>("Paid"); // ✅ Always Paid
+  const [message, setMessage] = useState<string>("");
+  const [paymentStatus, setPaymentStatus] = useState<string>("Pending");
   const [loading, setLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     if (order) {
-      setPaymentStatus("Paid"); // ✅ Force status to Paid
+      const formattedStatus =
+        order.payment_status?.charAt(0).toUpperCase() +
+        order.payment_status?.slice(1).toLowerCase();
+
+      setPaymentStatus(formattedStatus || "Pending");
       setMessage(order.validation_message || "Your GCash payment is verified");
-      setIsSaved(order.payment_status?.toLowerCase() === "paid");
+
+      if (formattedStatus === "Paid") setIsSaved(true);
     }
   }, [order]);
 
@@ -44,37 +47,39 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
         status: "unread",
       });
 
-      // ✅ Automatically mark Paid
-      const { data } = await axios.put(`${apiUrl}/update_order_status`, {
-        order_id: order?.order_id,
-        payment_status: "Paid",
-        created_by: workerId,
-      });
+      if (paymentStatus === "Paid") {
+        // Update order status & created_by
+        const { data } = await axios.put(`${apiUrl}/update_order_status`, {
+          order_id: order?.order_id,
+          payment_status: "Paid",
+          created_by: workerId, // ✅ fixed key name
+        });
+        // Update transaction/payment tables
+        await axios.put(`${apiUrl}/update_transaction_status`, {
+          user_id: order?.user_id,
+          status: "Completed",
+        });
+        await axios.put(`${apiUrl}/update_payment_status`, {
+          user_id: order?.user_id,
+          payment_status: "Completed",
+        });
 
-      // Update related transaction/payment
-      await axios.put(`${apiUrl}/update_transaction_status`, {
-        user_id: order?.user_id,
-        status: "Completed",
-      });
+        // ✅ Deduct inventory automatically
+        await axios.post(
+          `${apiUrl}/update_payment_status/${order.order_id}`,
+          { paymentStatus: "paid" } // must match backend check
+        );
 
-      await axios.put(`${apiUrl}/update_payment_status`, {
-        user_id: order?.user_id,
-        payment_status: "Completed",
-      });
+        // Update frontend state
+        if (onUpdateOrder && data.updatedOrder) {
+          onUpdateOrder(data.updatedOrder);
+        }
 
-      // ✅ Deduct inventory automatically
-      await axios.post(`${apiUrl}/update_payment_status/${order.order_id}`, {
-        paymentStatus: "paid",
-      });
-
-      if (onUpdateOrder && data.updatedOrder) {
-        onUpdateOrder(data.updatedOrder);
+        setIsSaved(true);
+        antdMessage.success("Payment completed & inventory updated!");
+      } else {
+        antdMessage.success("Validation saved successfully!");
       }
-
-      setIsSaved(true);
-      antdMessage.success(
-        "Payment automatically marked as Paid & inventory updated!"
-      );
     } catch (error: any) {
       console.error("Error saving order:", error);
       antdMessage.error(
@@ -87,15 +92,17 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ✅ Payment Status text box (no dropdown) */}
       <div>
         <label className="block font-medium mb-1">Payment Status</label>
-        <Input
+        <Select
           value={paymentStatus}
-          readOnly
-          disabled
-          className="font-semibold text-green-600"
-        />
+          onChange={setPaymentStatus}
+          className="w-full"
+          disabled={isSaved}
+        >
+          <Option value="Pending">Pending</Option>
+          <Option value="Paid">Paid</Option>
+        </Select>
       </div>
 
       <div>
@@ -111,9 +118,7 @@ const EditValidationModal: React.FC<EditValidationModalProps> = ({
 
       <div className="flex justify-end gap-2">
         <Tooltip
-          title={
-            isSaved ? "Payment already marked as Paid" : "Save your changes"
-          }
+          title={isSaved ? "Cannot edit a paid order" : "Save your changes"}
         >
           <Button
             type="primary"

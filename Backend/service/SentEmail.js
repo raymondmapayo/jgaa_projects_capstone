@@ -1,29 +1,60 @@
+/*
 const sgMail = require("@sendgrid/mail");
 
-// Ensure the API_KEY is either a valid string or throw an error if undefined
-const API_KEY = process.env.SENDGRID_API_KEY || ""; // Fallback to empty string if undefined
-if (!API_KEY) {
-  throw new Error("SENDGRID_API_KEY is not defined");
-}
+//Load API key
+const API_KEY = process.env.SENDGRID_API_KEY || "";
+if (!API_KEY) throw new Error("SENDGRID_API_KEY is not defined");
 
 sgMail.setApiKey(API_KEY);
 
-const message = {
-  to: "raymondmapayo@gmail.com", // Change to your recipient
-  from: "raymondmapayo@gmail.com", // Change to your verified sender
-  subject: "Sending with SendGrid is Fun",
-  text: "and easy to do anywhere, even with Node.js",
-  html: "<strong>and easy to do anywhere, even with Node.js</strong>",
-};
+const VERIFIED_SENDER = "hanzdarylqezada11@gmail.com";
 
-const sendEmail = async (message) => {
+// Send confirmation email (custom body supported)
+const sendConfirmationEmail = async (
+  email,
+  full_name,
+  reservation_date,
+  reservation_time,
+  table,
+  customBody // ✅ optional: use textbox content if provided
+) => {
+  const subject = "Reservation Confirmation - JGAA Restaurant";
+
+  const defaultBody = `
+    Hello ${full_name},
+
+    Your reservation is confirmed! 🎉
+
+    Reservation Details:
+    - Date: ${reservation_date}
+    - Time: ${reservation_time}
+    - Table: ${table}
+
+    Thank you for choosing JGAA Restaurant!
+  `;
+
+  const body = customBody?.trim() ? customBody : defaultBody;
+
+  const message = {
+    to: email,
+    from: VERIFIED_SENDER,
+    subject,
+    text: body,
+    html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2 style="color: #fa8c16;">Reservation Confirmed 🎉</h2>
+      <p>Hi <strong>${full_name}</strong>,</p>
+      <p>${body.replace(/\n/g, "<br/>")}</p>
+    </div>`,
+  };
+
   try {
     await sgMail.send(message);
-    console.log("Email sent successfully");
+    console.log(`✅ Reservation email sent to ${email}`);
   } catch (error) {
-    console.error("Error sending email:", error);
-    if (error.response) {
-      console.error("Response:", error.response.body);
-    }
+    console.error("❌ Error sending confirmation email:", error);
+    if (error.response) console.error("Response:", error.response.body);
   }
 };
+
+module.exports = { sendConfirmationEmail };
+/*/

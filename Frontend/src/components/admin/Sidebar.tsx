@@ -1,27 +1,28 @@
 import { Menu } from "antd";
 import { useEffect } from "react";
-import { FaReceipt, FaUserCheck, FaUsersGear } from "react-icons/fa6";
-import { IoChatboxSharp } from "react-icons/io5";
-import {
-  MdAnnouncement,
-  MdCategory,
-  MdInventory2,
-  MdMenuBook,
-  MdTableRestaurant,
-} from "react-icons/md";
-import { RiDashboardFill, RiUserSettingsFill } from "react-icons/ri";
+import { FaReceipt, FaUsersGear } from "react-icons/fa6";
+import { MdAnnouncement, MdInventory2, MdMenuBook } from "react-icons/md";
+import { RiDashboardFill } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
-import { StyledSider } from "../../styled/admin";
+import { StyledSider } from "../../styled/worker";
 
 interface SidebarProps {
   collapsed: boolean;
   setCollapsed: (value: boolean) => void;
 }
 
+// ✅ Define menu item type so TS knows children items have links
+type MenuGroup = {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  children: { key: string; label: string; link: string }[];
+};
+
 const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
   const navigate = useNavigate();
 
-  // Load sidebar state from localStorage (default open)
+  // Load sidebar state from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
     if (saved !== null) {
@@ -36,85 +37,113 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
     localStorage.setItem("sidebar-collapsed", String(collapsed));
   }, [collapsed]);
 
-  const menuItems = [
+  const menuItems: MenuGroup[] = [
     {
       key: "dashboard",
-      label: " Dashboard",
+      label: "Dashboard",
       icon: <RiDashboardFill size={25} />,
-      link: "/admin/dashboard",
+      children: [
+        {
+          key: "overview",
+          label: "Overview",
+          link: "/Admin/Dashboard",
+        },
+      ],
     },
     {
-      key: "menu",
-      label: "Manage Menu",
+      key: "menu_management",
+      label: "Menu Management",
       icon: <MdMenuBook size={25} />,
-      link: "/Admin/Manage/Menu",
+      children: [
+        {
+          key: "menu",
+          label: "Menu Items",
+          link: "/Admin/Manage/Menu",
+        },
+        {
+          key: "categories",
+          label: "Categories",
+          link: "/Admin/Manage/Categories",
+        },
+        {
+          key: "recipe",
+          label: "Ingredients",
+          link: "/Admin/Manage/Ingredients",
+        },
+      ],
     },
     {
-      key: "orders",
-      label: "Manage Orders",
-      icon: <FaReceipt size={25} />,
-      link: "/Admin/Manage/Order",
-    },
-    {
-      key: "reservation",
-      label: "Manage Reservation",
-      icon: <MdTableRestaurant size={25} />,
-      link: "/Admin/Manage/Reservation",
-    },
-
-    {
-      key: "categories",
-      label: "Manage Categories",
-      icon: <MdCategory size={25} />,
-      link: "/Admin/Manage/Categories",
-    },
-    {
-      key: "supply_categories",
-      label: "Manage Supply Categories",
-      icon: <RiUserSettingsFill size={25} />,
-      link: "/Admin/Manage/SupplyCategories",
-    },
-    {
-      key: "inventory",
-      label: "Manage Inventory",
+      key: "inventory_supplies",
+      label: "Inventory & Supplies",
       icon: <MdInventory2 size={25} />,
-      link: "/Admin/Manage/Inventory",
+      children: [
+        {
+          key: "inventory",
+          label: "Inventory & Supplies",
+          link: "/Admin/Manage/Inventory",
+        },
+        {
+          key: "supply_categories",
+          label: "Supply Categories",
+          link: "/Admin/Manage/SupplyCategories",
+        },
+        {
+          key: "supply",
+          label: "Supply",
+          link: "/Admin/Manage/Supply",
+        },
+      ],
     },
     {
-      key: "supply",
-      label: "Manage Supply",
-      icon: <RiUserSettingsFill size={25} />,
-      link: "/Admin/Manage/Supply",
+      key: "orders_reservations",
+      label: "Orders & Reservations",
+      icon: <FaReceipt size={25} />,
+      children: [
+        {
+          key: "orders",
+          label: "Orders",
+          link: "/Admin/Manage/Order",
+        },
+        {
+          key: "reservation",
+          label: "Reservation",
+          link: "/Admin/Manage/Reservation",
+        },
+      ],
     },
     {
-      key: "chats",
-      label: "Manage Chats",
-      icon: <IoChatboxSharp size={25} />,
-      link: "/Admin/Chats",
-    },
-    {
-      key: "recipe",
-      label: "Manage Ingredients",
-      icon: <MdTableRestaurant size={25} />,
-      link: "/Admin/Manage/Ingredients",
-    },
-    {
-      key: "users",
-      label: "User Management",
-      icon: <FaUserCheck size={25} />,
-      link: "/Admin/Manage/Users",
-    },
-    {
-      key: "workers",
-      label: "Workers Management",
+      key: "manage_users",
+      label: "Manage Users",
       icon: <FaUsersGear size={25} />,
-      link: "/Admin/Manage/Workers",
+      children: [
+        {
+          key: "users",
+          label: "Clients",
+          link: "/Admin/Manage/Users",
+        },
+        {
+          key: "workers",
+          label: "Workers",
+          link: "/Admin/Manage/Workers",
+        },
+      ],
     },
     {
-      key: "announcements",
-      label: "Announcements",
+      key: "chats_announcements",
+      label: "Chats & Announcements",
       icon: <MdAnnouncement size={25} />,
-      link: "/Admin/Announcements",
+      children: [
+        {
+          key: "workers_management",
+          label: "Workers Management",
+          link: "/Admin/Manage/Workers",
+        },
+        {
+          key: "announcements",
+          label: "Announcements",
+          link: "/Admin/Announcements",
+        },
+      ],
     },
   ];
 
@@ -136,7 +165,7 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
               className="w-12 rounded-full z-50 border"
               alt="Logo"
             />
-            <p className="font-bold text-[#fa8c16]">JGAA Restaurant</p>
+            <p className="font-bold text-[#fa8c16]">JGAA Food & Drinks</p>
           </div>
         )}
       </div>
@@ -146,24 +175,32 @@ const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
         <Menu
           theme="light"
           mode="inline"
+          defaultOpenKeys={["dashboard"]}
           defaultSelectedKeys={[
-            menuItems.find((item) => item.link === window.location.pathname)
-              ?.key || "dashboard",
+            menuItems
+              .flatMap((item) => item.children)
+              .find((child) => child.link === window.location.pathname)?.key ||
+              "overview",
           ]}
           onClick={({ key }) => {
-            const found = menuItems.find((item) => item.key === key);
+            const found = menuItems
+              .flatMap((group) => group.children)
+              .find((child) => child.key === key);
+
             if (found) navigate(found.link);
           }}
-        >
-          {menuItems.map((item) => (
-            <Menu.Item key={item.key} icon={item.icon}>
-              {item.label}
-            </Menu.Item>
-          ))}
-        </Menu>
+          items={menuItems.map((group) => ({
+            key: group.key,
+            icon: group.icon,
+            label: group.label,
+            children: group.children.map((child) => ({
+              key: child.key,
+              label: child.label,
+            })),
+          }))}
+        />
       </div>
 
-      {/* Footer */}
       {/* Footer */}
       {!collapsed && (
         <div className="footer-container">

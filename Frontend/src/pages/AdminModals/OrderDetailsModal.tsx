@@ -27,7 +27,7 @@ interface OrderDetailsModalProps {
   formatDateWithTime: (dateString: string) => string;
   calculateTotal: () => number;
 }
-
+const apiUrl = import.meta.env.VITE_API_URL;
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isVisible,
   order,
@@ -63,7 +63,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           </div>
           <div className="details-row font-bold text-lg text-green-600">
             <span>Total:</span>
-            <span>${calculateTotal().toFixed(2)}</span>
+            <span>₱{calculateTotal().toFixed(2)}</span>
           </div>
 
           <h3 className="mt-4 font-bold">Products:</h3>
@@ -71,17 +71,24 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             {orderItems.map((product: any, index: number) => (
               <li key={index} className="flex gap-3 items-center">
                 <img
-                  src={`http://localhost:8081/uploads/images/${product.menu_img}`}
+                  src={
+                    product.menu_img
+                      ? product.menu_img.startsWith("http")
+                        ? product.menu_img // Cloudinary URL
+                        : `${apiUrl}/uploads/images/${product.menu_img}` // local backend
+                      : "https://via.placeholder.com/48?text=No+Image" // fallback placeholder
+                  }
                   alt={product.item_name}
                   className="w-12 h-12 rounded object-cover"
                 />
+
                 <div>
                   <p className="font-semibold">{product.item_name}</p>
                   <p className="text-sm text-gray-600">
                     Quantity: {product.order_quantity}
                   </p>
                   <p className="text-sm text-gray-600">
-                    Price: ${product.price}
+                    Price: ₱{product.price}
                   </p>
                   <p className="text-sm text-gray-600">Sizes: {product.size}</p>
                 </div>

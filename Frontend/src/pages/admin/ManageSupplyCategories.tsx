@@ -12,38 +12,56 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 
 import dayjs from "dayjs"; // ✅ import dayjs
-import AddSupplyCategories from "./AdminModals/AddSupplyCategories";
-import Archive from "./AdminModals/Archive";
-import EditSupplyCategories from "./AdminModals/EditSupplyCategories";
-
+import AddSupplyCategories from "../AdminModals/AddSupplyCategories";
+import Archive from "../AdminModals/Archive";
+import EditSupplyCategories from "../AdminModals/EditSupplyCategories";
+// ====================== Styled Components ======================
 const StyledContainer = styled.div`
+  width: 100%;
   background-color: #fff;
   border-radius: 12px;
-  padding: 16px;
+  padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
-  transition: background-color 0.3s;
+  transition: background-color 0.3s ease;
+  margin: 0 auto;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
+
+  /* ===== Mobile full-stretch ===== */
+  @media (max-width: 1024px) {
+    border-radius: 0;
+    box-shadow: none;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    padding: 16px;
+  }
 `;
 
 const StyledTable = styled(Table)`
+  width: 100%;
+  .ant-table {
+    width: 100%;
+  }
+
   .ant-table-thead > tr > th {
     background: #f9fafb;
     font-weight: bold;
     color: #374151;
   }
-  .ant-table {
-    border-radius: 8px;
-  }
+
   tr:hover td {
     background-color: #f9fafb !important;
   }
-  @media (max-width: 768px) {
-    .ant-table {
-      font-size: 13px;
+
+  /* Make table responsive on smaller screens */
+  @media (max-width: 1024px) {
+    font-size: 13px;
+    .ant-table-content {
+      overflow-x: auto;
     }
   }
 `;
@@ -78,14 +96,13 @@ const ManageSupplyCategories = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentMenus = dataSource.slice(indexOfFirstItem, indexOfLastItem);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const apiUrl = import.meta.env.VITE_API_URL;
   // ✅ Fetch supply categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:8081/get_supply_categories"
-        );
-        setDataSource(response.data);
+        const response = await axios.get(`${apiUrl}/get_supply_categories`);
+        setDataSource(response.data); // replaces old data
       } catch (error) {
         console.error("Error fetching supply categories:", error);
       } finally {
@@ -93,10 +110,8 @@ const ManageSupplyCategories = () => {
       }
     };
 
-    fetchCategories();
-    const interval = setInterval(fetchCategories, 10000); // every 10s
-    return () => clearInterval(interval);
-  }, []);
+    fetchCategories(); // fetch only once
+  }, [apiUrl]);
 
   // ✅ Handle Add Category
   const handleAddCategory = (newCategory: SupplyCategoryItem) => {
@@ -118,13 +133,11 @@ const ManageSupplyCategories = () => {
             prevData.filter((item) => item.cat_supply_id !== cat_supply_id)
           );
           await axios.delete(
-            `http://localhost:8081/delete_supply_category/${cat_supply_id}`
+            `${apiUrl}/delete_supply_category/${cat_supply_id}`
           );
         } catch (error) {
           console.error("Error deleting supply category:", error);
-          const response = await axios.get(
-            "http://localhost:8081/get_supply_categories"
-          );
+          const response = await axios.get(`${apiUrl}/get_supply_categories`);
           setDataSource(response.data);
         }
       },

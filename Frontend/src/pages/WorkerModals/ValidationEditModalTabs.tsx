@@ -16,7 +16,7 @@ const ValidationEditTabsModal: React.FC<ValidationEditTabsModalProps> = ({
   isVisible,
   onClose,
   order,
-  transaction,
+
   onUpdateOrder,
 }) => {
   return (
@@ -25,11 +25,21 @@ const ValidationEditTabsModal: React.FC<ValidationEditTabsModalProps> = ({
       open={isVisible}
       onCancel={onClose}
       footer={null}
-      width={700}
+      width={690} // ✅ smaller width for box look
+      style={{
+        maxHeight: "600px", // ✅ limit height to create box shape
+        overflowY: "auto", // ✅ scroll if content exceeds height
+        borderRadius: 12, // ✅ smooth rounded box corners
+      }}
+      bodyStyle={{
+        padding: "16px", // ✅ balanced inner spacing
+      }}
+      centered // ✅ center modal on screen
     >
-      <Tabs defaultActiveKey="1">
+      <Tabs defaultActiveKey="1" centered>
         <TabPane tab="Validate" key="1">
-          <ValidationModal transaction={transaction} />
+          {/* ✅ FIX: pass order instead of transaction */}
+          <ValidationModal order={order} />
         </TabPane>
         <TabPane tab="Edit" key="2">
           <EditValidationModal order={order} onUpdateOrder={onUpdateOrder} />

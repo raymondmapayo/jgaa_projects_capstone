@@ -41,7 +41,7 @@ interface ViewInventoryModalProps {
   selectedItem?: any | null;
   onClose: () => void;
 }
-
+const apiUrl = import.meta.env.VITE_API_URL;
 const ViewInventoryModal: React.FC<ViewInventoryModalProps> = ({
   visible,
   selectedItem,
@@ -94,7 +94,7 @@ const ViewInventoryModal: React.FC<ViewInventoryModalProps> = ({
           {/* Creator Info */}
           <div className="creator-info">
             <img
-              src={`http://localhost:8081/uploads/images/${selectedItem.profile_pic}`}
+              src={`${apiUrl}/uploads/images/${selectedItem.profile_pic}`}
               alt={`${selectedItem.fname} ${selectedItem.lname}`}
               className="creator-avatar"
             />

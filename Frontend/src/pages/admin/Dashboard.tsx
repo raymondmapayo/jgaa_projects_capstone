@@ -7,13 +7,13 @@ import {
   FaTags,
   FaWallet,
 } from "react-icons/fa";
-import TopSelling from "../../components/worker/WorkerTopSelling";
-import TotalRevenue from "../../components/worker/WorkerTotalRevenue";
+import TopSelling from "../../components/admin/TopSelling";
+import TotalRevenue from "../../components/admin/TotalRevenue";
 import MostReservedTablesChart from "../charts/MostReservedTablesChart";
 import TopSellingProductsChart from "../charts/TopSellingProductsChart";
 import TotalCustomersChart from "../charts/TotalCustomersChart";
-import CategoriesModal from "../WorkerModals/CategoriesModal";
-import TotalProductsModal from "../WorkerModals/TotalProductsModal";
+import CategoriesModal from "../AdminModals/CategoriesModal";
+import TotalProductsModal from "../AdminModals/TotalProductsModal";
 
 import { Button, DatePicker, Modal, message } from "antd";
 import dayjs, { Dayjs } from "dayjs";

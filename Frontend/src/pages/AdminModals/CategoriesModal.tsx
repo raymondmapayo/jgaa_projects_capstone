@@ -8,15 +8,15 @@ interface Category {
 }
 
 interface CategoriesModalProps {
-  visible: boolean;
+  open: boolean;
   onClose: () => void;
   categories: Category[];
   totalCategories: number | null;
   change: string;
 }
-
+const apiUrl = import.meta.env.VITE_API_URL;
 const CategoriesModal = ({
-  visible,
+  open,
   onClose,
   categories,
   totalCategories,
@@ -25,7 +25,7 @@ const CategoriesModal = ({
   return (
     <Modal
       title="Categories Details"
-      visible={visible}
+      open={open}
       onCancel={onClose}
       footer={[
         <button
@@ -60,7 +60,7 @@ const CategoriesModal = ({
               className="flex items-center space-x-4 p-2 border rounded"
             >
               <img
-                src={`http://localhost:8081/uploads/images/${cat.categories_img}`} // adjust path as needed
+                src={`${apiUrl}/uploads/images/${cat.categories_img}`} // adjust path as needed
                 alt={cat.categories_name}
                 className="w-20 h-20 object-cover rounded"
               />

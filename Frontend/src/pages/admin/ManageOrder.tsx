@@ -17,34 +17,57 @@ import {
 import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
-import OrderDetailsModal from "./AdminModals/OrderDetailsModal";
-import ValidationEditTabsModal from "./AdminModals/ValidationEditTabsModal";
+import OrderDetailsModal from "../AdminModals/OrderDetailsModal";
+import ValidationEditTabsModal from "../AdminModals/ValidationEditTabsModal";
 
-// Styled Components
+// ====================== Styled Components ======================
 const StyledContainer = styled.div`
+  width: 100%;
   background-color: #fff;
   border-radius: 12px;
-  padding: 16px;
+  padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
-  transition: background-color 0.3s;
+  transition: background-color 0.3s ease;
+  margin: 0 auto;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
+
+  /* ===== Mobile full-stretch ===== */
+  @media (max-width: 1024px) {
+    border-radius: 0;
+    box-shadow: none;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    padding: 16px;
+  }
 `;
 
 const StyledTable = styled(Table)`
+  width: 100%;
+  .ant-table {
+    width: 100%;
+  }
+
   .ant-table-thead > tr > th {
     background: #f9fafb;
     font-weight: bold;
     color: #374151;
   }
+
   tr:hover td {
     background-color: #f9fafb !important;
   }
-  @media (max-width: 768px) {
+
+  /* Make table responsive on smaller screens */
+  @media (max-width: 1024px) {
     font-size: 13px;
+    .ant-table-content {
+      overflow-x: auto;
+    }
   }
 `;
 
@@ -59,7 +82,7 @@ const ActionButton = styled(Button)`
   }
 `;
 
-const AdminManageOrder = () => {
+const ManageOrder = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -70,11 +93,11 @@ const AdminManageOrder = () => {
   const [selectedOrderForValidation, setSelectedOrderForValidation] =
     useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
-
+  const apiUrl = import.meta.env.VITE_API_URL;
   // Handler to fetch transaction and open combined Validate & Edit modal
   const handleValidateEdit = (record: any) => {
     axios
-      .get(`http://localhost:8081/fetch_transaction/${record.user_id}`)
+      .get(`${apiUrl}/fetch_transaction/${record.user_id}`)
       .then((res) => {
         const transactions = res.data.transactions;
 
@@ -119,7 +142,7 @@ const AdminManageOrder = () => {
 
   useEffect(() => {
     axios
-      .get("http://localhost:8081/fetch_orders")
+      .get(`${apiUrl}/fetch_orders`)
       .then((response) => {
         setOrders(response.data.orders);
       })
@@ -131,7 +154,7 @@ const AdminManageOrder = () => {
   const handleViewDetails = (record: any) => {
     setSelectedOrder(record);
     axios
-      .get(`http://localhost:8081/fetch_order_items/${record.order_id}`)
+      .get(`${apiUrl}/fetch_order_items/${record.order_id}`)
       .then((response) => {
         setOrderItems(response.data.orderItems);
         setIsModalVisible(true);
@@ -179,7 +202,7 @@ const AdminManageOrder = () => {
           <img
             src={
               record.profile_pic && record.profile_pic !== ""
-                ? `http://localhost:8081/uploads/images/${record.profile_pic}`
+                ? `${apiUrl}/uploads/images/${record.profile_pic}`
                 : "/avatar.jpg"
             }
             alt={`${record.fname} ${record.lname}`}
@@ -229,7 +252,7 @@ const AdminManageOrder = () => {
             <img
               src={
                 record.worker_profile_pic && record.worker_profile_pic !== ""
-                  ? `http://localhost:8081/uploads/images/${record.worker_profile_pic}`
+                  ? `${apiUrl}/uploads/images/${record.worker_profile_pic}`
                   : "/avatar.jpg"
               }
               alt={
@@ -367,4 +390,4 @@ const AdminManageOrder = () => {
   );
 };
 
-export default AdminManageOrder;
+export default ManageOrder;

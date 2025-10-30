@@ -11,38 +11,56 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import AddMenuForm from "../../components/form/AddMenu";
-import MenuEditModal from "./AdminModals/MenuEditModal";
-import ViewDetailsModal from "./AdminModals/ViewDetailsModal";
+import MenuEditModal from "../AdminModals/MenuEditModal";
+import ViewDetailsModal from "../AdminModals/ViewDetailsModal";
 
-// Styled Components
+// ====================== Styled Components ======================
 const StyledContainer = styled.div`
+  width: 100%;
   background-color: #fff;
   border-radius: 12px;
-  padding: 16px;
+  padding: 24px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
-  transition: background-color 0.3s;
+  transition: background-color 0.3s ease;
+  margin: 0 auto;
 
   .dark & {
     background-color: #001f3f;
     color: white;
   }
+
+  /* ===== Mobile full-stretch ===== */
+  @media (max-width: 1024px) {
+    border-radius: 0;
+    box-shadow: none;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    padding: 16px;
+  }
 `;
 
 const StyledTable = styled(Table)`
+  width: 100%;
+  .ant-table {
+    width: 100%;
+  }
+
   .ant-table-thead > tr > th {
     background: #f9fafb;
     font-weight: bold;
     color: #374151;
   }
-  .ant-table {
-    border-radius: 8px;
-  }
+
   tr:hover td {
     background-color: #f9fafb !important;
   }
-  @media (max-width: 768px) {
-    .ant-table {
-      font-size: 13px;
+
+  /* Make table responsive on smaller screens */
+  @media (max-width: 1024px) {
+    font-size: 13px;
+    .ant-table-content {
+      overflow-x: auto;
     }
   }
 `;
@@ -57,6 +75,7 @@ const ActionButton = styled(Button)`
     transform: scale(1.05);
   }
 `;
+
 interface MenuItem {
   key: string;
   item_name: string;
@@ -69,7 +88,7 @@ interface MenuItem {
   availability: string; // Add availability property
 }
 
-const AdminManageMenu = () => {
+const ManageMenu = () => {
   const [dataSource, setDataSource] = useState<MenuItem[]>([]);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -82,13 +101,13 @@ const AdminManageMenu = () => {
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentMenus = dataSource.slice(indexOfFirstItem, indexOfLastItem);
-
+  const apiUrl = import.meta.env.VITE_API_URL;
   // Fetch menu items from the database
   useEffect(() => {
     const fetchMenuItems = async () => {
       try {
-        const response = await axios.get("http://localhost:8081/menu_items");
-        console.log("Fetched Data:", response.data); // Debugging
+        const response = await axios.get(`${apiUrl}/menu_items`);
+        console.log("Fetched Data:", response.data);
         setDataSource(response.data);
       } catch (error) {
         console.error("Error fetching menu items:", error);
@@ -97,12 +116,9 @@ const AdminManageMenu = () => {
       }
     };
 
+    // Initial fetch on mount
     fetchMenuItems();
-    // Poll every 10 seconds
-    const interval = setInterval(fetchMenuItems, 10);
-
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, []);
+  }, [apiUrl]);
 
   // Handlers
   const handleViewDetails = (record: any) => {
@@ -115,17 +131,15 @@ const AdminManageMenu = () => {
     setIsEditModalVisible(true);
   };
 
-  const handleSaveEdit = (values: MenuItem) => {
-    const updatedData = dataSource.map((item) => {
-      if (item.menu_id === selectedItem?.menu_id) {
-        return { ...item, ...values }; // Merge updated values (including menu_img)
-      }
-      return item; // Leave the other rows unchanged
-    });
+  // Updated Save Edit handler
+  const handleSaveEdit = async (values: MenuItem) => {
+    const updatedData = dataSource.map((item) =>
+      item.menu_id === selectedItem?.menu_id ? { ...item, ...values } : item
+    );
 
-    setDataSource(updatedData); // Update dataSource with the new row
-    setIsEditModalVisible(false); // Close the modal
-    setSelectedItem(null); // Clear the selected item
+    setDataSource(updatedData); // update table
+    setIsEditModalVisible(false);
+    setSelectedItem(null);
   };
 
   // Table Columns
@@ -137,7 +151,11 @@ const AdminManageMenu = () => {
       render: (text: any, record: any) => (
         <div className="flex items-center gap-3 min-w-[160px]">
           <img
-            src={`http://localhost:8081/uploads/images/${record.menu_img}`}
+            src={
+              record.menu_img?.startsWith("http")
+                ? record.menu_img
+                : `${apiUrl}/uploads/images/${record.menu_img}`
+            }
             alt={record.item_name}
             className="w-10 h-10 rounded object-cover flex-shrink-0"
           />
@@ -185,16 +203,16 @@ const AdminManageMenu = () => {
     },
   ];
 
+  // Updated Add Menu handler
   const handleAddMenu = async () => {
     try {
-      const response = await axios.get("http://localhost:8081/menu_items");
-      setDataSource(response.data);
+      const response = await axios.get(`${apiUrl}/menu_items`);
+      setDataSource(response.data); // refresh table after adding
       setIsAddModalVisible(false);
     } catch (error) {
       console.error("Error fetching updated menu items:", error);
     }
   };
-
   return (
     <StyledContainer>
       {/* Header Section */}
@@ -301,4 +319,4 @@ const AdminManageMenu = () => {
   );
 };
 
-export default AdminManageMenu;
+export default ManageMenu;

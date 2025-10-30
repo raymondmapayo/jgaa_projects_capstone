@@ -1,14 +1,14 @@
 import { Modal } from "antd";
 
 interface TotalProductsModalProps {
-  visible: boolean;
+  open: boolean; // changed from `visible`
   onClose: () => void;
   totalProducts: number | null;
   change: string;
 }
 
 const TotalProductsModal = ({
-  visible,
+  open,
   onClose,
   totalProducts,
   change,
@@ -16,7 +16,7 @@ const TotalProductsModal = ({
   return (
     <Modal
       title="Total Products Details"
-      visible={visible}
+      open={open}
       onCancel={onClose}
       footer={[
         <button

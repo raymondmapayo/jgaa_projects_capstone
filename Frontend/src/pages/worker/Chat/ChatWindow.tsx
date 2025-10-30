@@ -71,7 +71,7 @@ const ChatWindow = ({
                 }
                 className="w-10 h-10 rounded-full"
               />
-              <h2 className="text-lg font-bold truncate max-w-[120px]">
+              <h2 className="text-lg font-bold truncate sm:truncate md:overflow-visible max-w-[120px] md:max-w-full">
                 {selectedUser.fname} {selectedUser.lname}
               </h2>
             </>

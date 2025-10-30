@@ -6,16 +6,18 @@ import React, { useEffect, useState } from "react";
 interface IngredientsModalProps {
   visible: boolean;
   onClose: () => void;
+  onIngredientAdded?: (newIngredients: any[], category: string) => void;
 }
 
 interface MenuItem {
   menu_id: number;
   item_name: string;
 }
-
+const apiUrl = import.meta.env.VITE_API_URL;
 const IngredientsModal: React.FC<IngredientsModalProps> = ({
   visible,
   onClose,
+  onIngredientAdded, // <-- destructure here
 }) => {
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<MenuItem[]>([]);
@@ -24,7 +26,7 @@ const IngredientsModal: React.FC<IngredientsModalProps> = ({
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get("http://localhost:8081/menu_items");
+      const res = await axios.get(`${apiUrl}/menu_items`);
       setCategories(res.data);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -37,16 +39,23 @@ const IngredientsModal: React.FC<IngredientsModalProps> = ({
 
   const handleAddIngredient = async (values: any) => {
     try {
+      const addedIngredients = [];
       for (const ing of values.ingredients) {
-        await axios.post("http://localhost:8081/add_ingredients", {
+        const res = await axios.post(`${apiUrl}/add_ingredients`, {
           ingredients_name: ing.name,
           measurement: ing.measurement,
           unit: ing.unit,
           category: values.category,
         });
+        addedIngredients.push(res.data.ingredient); // <-- push inserted ingredient
       }
+
       message.success("Ingredients added successfully!");
       form.resetFields();
+
+      if (onIngredientAdded)
+        onIngredientAdded(addedIngredients, values.category);
+
       onClose();
     } catch (error) {
       console.error("Error adding ingredients:", error);

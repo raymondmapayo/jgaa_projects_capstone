@@ -5,9 +5,9 @@ import Swal from "sweetalert2";
 import socket from "../../types/socket";
 
 type Message = {
-  id: number;
+  message_id?: number;
   message: string;
-  sender: string; // "client" or "worker"
+  sender: string;
   timestamp: string;
 };
 
@@ -15,7 +15,6 @@ const MessageClient = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [userRole, setUserRole] = useState("");
   const [userId, setUserId] = useState("");
   const [sentGreeting, setSentGreeting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -27,24 +26,25 @@ const MessageClient = () => {
     const storedUserId = sessionStorage.getItem("user_id");
     if (!storedUserRole || !storedUserId) return;
 
-    setUserRole(storedUserRole);
     setUserId(storedUserId);
 
-    // Join Socket.IO room only once
-    if (storedUserRole === "client") {
-      socket.emit("joinClientRoom", storedUserId);
-    } else if (storedUserRole === "worker") {
-      socket.emit("joinWorkerRoom", storedUserId);
-    }
+    // Join socket room
+    socket.emit(
+      storedUserRole === "client" ? "joinClientRoom" : "joinWorkerRoom",
+      storedUserId
+    );
 
-    // Listen once for incoming messages
     const handleNewMessage = (data: any) => {
       if (data.receiver_id === storedUserId) {
         setMessages((prev) => {
-          if (prev.some((m) => m.id === data.id)) return prev;
-          const updated = [...prev, data];
-          sessionStorage.setItem("messages", JSON.stringify(updated));
-          return updated;
+          const exists = prev.some(
+            (m) =>
+              m.message === data.message &&
+              new Date(m.timestamp).getTime() ===
+                new Date(data.timestamp).getTime()
+          );
+          if (exists) return prev;
+          return [...prev, data];
         });
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }
@@ -52,14 +52,26 @@ const MessageClient = () => {
 
     socket.on("newMessage", handleNewMessage);
 
-    // Fetch initial messages
     const fetchMessages = async () => {
       try {
-        const res =
-          storedUserRole === "client"
-            ? await axios.get(`${apiUrl}/getClientMessages/${storedUserId}`)
-            : await axios.get(`${apiUrl}/getWorkerMessages/${storedUserId}`);
-        setMessages(res.data.reverse());
+        const res = await axios.get(
+          `${apiUrl}/getClientMessages/${storedUserId}`
+        );
+
+        // ✅ Filter duplicate messages by text + timestamp
+        const uniqueMessages = res.data.filter(
+          (msg: Message, index: number, self: Message[]) =>
+            index ===
+            self.findIndex(
+              (m) =>
+                m.message === msg.message &&
+                new Date(m.timestamp).getTime() ===
+                  new Date(msg.timestamp).getTime()
+            )
+        );
+
+        // ✅ Sort oldest → newest for better UI flow
+        setMessages(uniqueMessages.reverse());
       } catch (err) {
         console.error(err);
       }
@@ -70,15 +82,14 @@ const MessageClient = () => {
     return () => {
       socket.off("newMessage", handleNewMessage);
     };
-  }, []); // ✅ Empty array — run once only
+  }, []);
 
   // Greeting
   useEffect(() => {
     if (isOpen && !sentGreeting) {
       const greetingMessage: Message = {
-        id: Date.now(),
-        sender: "worker",
         message: "Hello! How can I assist you today?",
+        sender: "worker",
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [greetingMessage, ...prev]);
@@ -91,17 +102,13 @@ const MessageClient = () => {
 
     const messageData = {
       message: newMessage,
-      sender_role: userRole,
       sender_id: userId,
     };
 
     try {
-      const res = await axios.post(
-        `${apiUrl}/sendMessageToAllWorkers`,
-        messageData
-      );
+      await axios.post(`${apiUrl}/sendMessageToAllWorkers`, messageData);
+
       const newMessageObj: Message = {
-        id: res.data.message_id,
         message: newMessage,
         sender: "client",
         timestamp: new Date().toISOString(),
@@ -122,7 +129,7 @@ const MessageClient = () => {
         timer: 2000,
       });
     } catch (err) {
-      console.error(err);
+      console.error("Error sending message:", err);
     }
   };
 
@@ -148,9 +155,9 @@ const MessageClient = () => {
 
           <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-100">
             {messages.length > 0 ? (
-              messages.map((msg) => (
+              messages.map((msg, i) => (
                 <div
-                  key={`${msg.id}-${msg.timestamp}`}
+                  key={i}
                   className={`flex ${
                     msg.sender === "worker" ? "justify-start" : "justify-end"
                   }`}

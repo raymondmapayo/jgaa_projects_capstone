@@ -13,7 +13,7 @@ interface Notification {
 }
 
 interface ClientNotificationProps {
-  asTextButton?: boolean; // 👈 new prop to toggle "bell" vs "Notifications"
+  asTextButton?: boolean; // 👈 toggle "bell" vs "Notifications"
 }
 
 const ClientNotification: React.FC<ClientNotificationProps> = ({
@@ -23,14 +23,14 @@ const ClientNotification: React.FC<ClientNotificationProps> = ({
   const [loading, setLoading] = useState(true);
   const [popoverVisible, setPopoverVisible] = useState(false);
   const isAuthenticated = sessionStorage.getItem("isAuthenticated") === "true";
-
   const userId = Number(sessionStorage.getItem("user_id"));
   const apiUrl = import.meta.env.VITE_API_URL;
+
   const fetchNotifications = async () => {
     if (!userId) return;
     try {
       const res = await axios.get(`${apiUrl}/notifications/${userId}`);
-      setNotifications(res.data);
+      setNotifications(res.data || []); // ✅ Array of notifications
     } catch (err) {
       console.error("Error fetching notifications:", err);
     } finally {
@@ -68,10 +68,7 @@ const ClientNotification: React.FC<ClientNotificationProps> = ({
         placement: "topRight",
         duration: 2,
       });
-
-      // redirect after a short delay
       setTimeout(() => {}, 500);
-
       return null;
     }
 
@@ -86,29 +83,42 @@ const ClientNotification: React.FC<ClientNotificationProps> = ({
   };
 
   const content = loading ? (
-    <Spin />
+    <div className="flex items-center justify-center p-4">
+      <Spin />
+    </div>
   ) : notifications.length === 0 ? (
     <div className="p-2 text-center text-gray-500">No notifications</div>
   ) : (
-    <List
-      size="small"
-      dataSource={notifications}
-      renderItem={(item) => (
-        <List.Item
-          className={`flex justify-between items-center cursor-pointer px-2 py-1 ${
-            item.status === "read"
-              ? "opacity-50"
-              : "opacity-100 hover:bg-gray-100"
-          }`}
-          onClick={() => handleNotificationClick(item.client_notification_id)}
-        >
-          <span>{item.message}</span>
-          <span className="text-xs text-slate-800">
-            {dayjs(item.created_at).format("MM/DD/YYYY, hh:mm A")}
-          </span>
-        </List.Item>
-      )}
-    />
+    <div
+      className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+      style={{
+        width: "320px",
+        scrollbarWidth: "thin",
+        scrollbarColor: "#fa8c16 #f0f0f0",
+      }}
+    >
+      <List
+        size="small"
+        dataSource={notifications}
+        renderItem={(item) => (
+          <List.Item
+            className={`flex justify-between items-center cursor-pointer px-2 py-1 ${
+              item.status === "read"
+                ? "opacity-50"
+                : "opacity-100 hover:bg-gray-100"
+            }`}
+            onClick={() => handleNotificationClick(item.client_notification_id)}
+          >
+            <div className="flex flex-col w-full">
+              <span className="text-sm text-gray-800">{item.message}</span>
+              <span className="text-xs text-gray-500 text-right mt-1">
+                {dayjs(item.created_at).format("MM/DD/YYYY, hh:mm A")}
+              </span>
+            </div>
+          </List.Item>
+        )}
+      />
+    </div>
   );
 
   return (
