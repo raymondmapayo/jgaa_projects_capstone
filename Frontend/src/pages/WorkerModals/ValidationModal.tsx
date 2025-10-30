@@ -166,9 +166,21 @@ const ValidationModal: React.FC<ValidationModalProps> = ({ order }) => {
             title="Proof of Payment"
           >
             <Image
-              src={`${apiUrl}/uploads/images/${transaction.proof_image}`}
+              src={
+                transaction.proof_image
+                  ? transaction.proof_image.startsWith("http")
+                    ? transaction.proof_image // Cloudinary URL
+                    : `${apiUrl}/uploads/images/${transaction.proof_image}` // fallback to backend path
+                  : "https://via.placeholder.com/150?text=No+Image" // final placeholder
+              }
               alt="Proof of payment"
-              style={{ borderRadius: 8 }}
+              style={{
+                borderRadius: 8,
+                width: "180px", // ✅ smaller image size
+                height: "auto",
+                objectFit: "contain",
+                display: "inline-block", // ✅ keeps it centered horizontally
+              }}
               preview={{ mask: "Click to Preview" }}
             />
           </Card>
