@@ -2409,46 +2409,24 @@ app.post("/add_reservation/:user_id", (req, res) => {
     table_ids,
   } = req.body;
 
-  console.log("Received reservation data:", req.body);
+  // ⏰ Validate reservation time (8 AM – 1 AM)
+  const hour = parseInt(reservation_time.split(":")[0], 10);
+  const isPM = reservation_time.toLowerCase().includes("pm");
 
-  // Validate required fields
-  if (
-    !full_name ||
-    !email ||
-    !pnum ||
-    !reservation_date ||
-    !reservation_time ||
-    !num_of_people
-  ) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
+  let hour24 = hour;
+  if (isPM && hour !== 12) hour24 += 12;
+  if (!isPM && hour === 12) hour24 = 0;
 
-  // Validate reservation time (8 AM – 1 AM)
-  const timeMatch = reservation_time.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
-  if (!timeMatch) {
-    return res
-      .status(400)
-      .json({ error: "Invalid time format (use HH:MMam/pm)" });
-  }
-
-  let hour = parseInt(timeMatch[1], 10);
-  const minute = parseInt(timeMatch[2], 10);
-  const isPM = timeMatch[3].toLowerCase() === "pm";
-
-  if (isPM && hour !== 12) hour += 12;
-  if (!isPM && hour === 12) hour = 0;
-
-  if (hour < 8 && hour !== 0) {
+  if (hour24 < 8 && hour24 !== 0 && hour24 !== 1) {
     return res
       .status(400)
       .json({ error: "Reservations are only open from 8 AM to 1 AM." });
   }
 
-  // Fetch user
   const fetchUserSql = "SELECT * FROM user_tbl WHERE user_id = ?";
   db.query(fetchUserSql, [user_id], (error, results) => {
     if (error) {
-      console.error("Error fetching user:", error);
+      console.error("Error fetching user data:", error);
       return res.status(500).json({ error: "Internal Server Error" });
     }
 
@@ -2457,29 +2435,29 @@ app.post("/add_reservation/:user_id", (req, res) => {
     }
 
     const user = results[0];
-    const finalName = full_name || `${user.fname} ${user.lname}`;
-    const finalPhone = pnum || user.pnum;
+    const userFullName = full_name || `${user.fname} ${user.lname}`;
+    const userPhone = pnum || user.pnum;
 
-    // Insert reservation
     const insertReservationSql = `
-      INSERT INTO reservation_tbl
+       INSERT INTO reservation_tbl 
       (user_id, email, full_name, reservation_date, reservation_time, pnum, num_of_people, status, payment_status, table_status, special_request, reservation_type, reservation_status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+
     const values = [
       user_id,
       email,
-      finalName,
+      userFullName,
       reservation_date,
       reservation_time,
-      finalPhone,
+      userPhone,
       num_of_people,
-      "pending",
-      "pending",
-      "Reserved",
-      special_request || "",
+      "pending", // status
+      "pending", // payment_status
+      "Reserved", // table_status ✅
+      special_request,
       "Reservation",
-      "Active",
+      "Active", // reservation_status
     ];
 
     db.query(insertReservationSql, values, (err, result) => {
@@ -2490,23 +2468,20 @@ app.post("/add_reservation/:user_id", (req, res) => {
 
       const reserveId = result.insertId;
 
-      // If tables selected, insert into usertable_list
       if (Array.isArray(table_ids) && table_ids.length > 0) {
+        const insertTableSql = `
+          INSERT INTO usertable_list (reservation_id, user_id, table_id)
+          VALUES ?
+        `;
         const tableValues = table_ids.map((tableId) => [
           reserveId,
           user_id,
           tableId,
         ]);
-        console.log("Inserting table values:", tableValues);
-
-        const insertTableSql = `
-          INSERT INTO usertable_list (reservation_id, user_id, table_id)
-          VALUES ?
-        `;
 
         db.query(insertTableSql, [tableValues], (err2) => {
           if (err2) {
-            console.error("Error inserting tables:", err2);
+            console.error("Error inserting user tables:", err2);
             return res.status(500).json({ error: "Internal Server Error" });
           }
 
@@ -2522,6 +2497,36 @@ app.post("/add_reservation/:user_id", (req, res) => {
         });
       }
     });
+  });
+});
+
+// Mark Reserved tables as Completed if past reservation time
+
+app.post("/update_completed_tables", (req, res) => {
+  const query = `
+    UPDATE reservation_tbl
+    SET table_status = 'Completed'
+    WHERE table_status = 'Reserved'
+    AND (
+      -- Mark if reservation was before today
+      reservation_date < CURDATE()
+      -- Or if current time is past 1 AM today (means previous day reservations)
+      OR (
+        reservation_date = CURDATE() - INTERVAL 1 DAY
+        AND CURTIME() >= '01:00:00'
+      )
+    )
+  `;
+
+  db.query(query, (err, result) => {
+    if (err) {
+      console.error("❌ Error updating table_status:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    console.log(
+      "✅ Reserved tables automatically marked as Completed after 1 AM."
+    );
+    res.json({ success: true });
   });
 });
 
