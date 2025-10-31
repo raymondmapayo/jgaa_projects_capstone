@@ -1436,12 +1436,13 @@ app.post("/register", async (req, res) => {
             });
           }
 
-          try {
-            // Try to send email (but don't crash if it fails)
-            const emailSent = await sendConfirmationEmail({
-              email: email,
-              verification_token: verificationToken,
-            });
+         try {
+          // Send email via EmailJS
+          const emailSent = await sendConfirmationEmail({
+            email,
+            name: `${fname} ${lname}`,
+            verification_token: verificationToken,
+          });
 
             if (emailSent) {
               res.status(200).json({
