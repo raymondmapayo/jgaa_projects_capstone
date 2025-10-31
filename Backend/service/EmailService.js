@@ -1,18 +1,18 @@
 // service/EmailService.js
 const nodemailer = require("nodemailer");
 
-// Use Sendmail (works on Render)
 const transporter = nodemailer.createTransport({
-  sendmail: true,
-  newline: "unix",
-  path: "/usr/sbin/sendmail",
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_EMAIL, // Gmail address
+    pass: process.env.SMTP_PASS, // App password
+  },
 });
 
 const sendConfirmationEmail = async (user) => {
   const verificationUrl = `https://jgaa-projects-capstone.vercel.app/verify-email?token=${user.verification_token}`;
 
   const mailOptions = {
-    // ✅ Use your .env Gmail address just as display name (not for login)
     from: `"Jgaa Thai Restaurant" <${process.env.SMTP_EMAIL}>`,
     to: user.email,
     subject: "Please Verify Your Email Address",
@@ -31,7 +31,7 @@ const sendConfirmationEmail = async (user) => {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log("✅ Verification email sent:", info.envelope);
+    console.log("✅ Verification email sent:", info.response);
     return true;
   } catch (err) {
     console.error("❌ Error sending email:", err);
