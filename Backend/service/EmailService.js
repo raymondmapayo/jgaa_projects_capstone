@@ -1,56 +1,50 @@
 // service/EmailService.js
-const sgMail = require("@sendgrid/mail");
+const nodemailer = require("nodemailer");
 
-// 🧠 Add these two lines here
-console.log("SENDGRID_API_KEY exists:", !!process.env.SENDGRID_API_KEY);
-console.log("SMTP_EMAIL:", process.env.SMTP_EMAIL);
+// Create a transporter object using your SMTP service
+const transporter = nodemailer.createTransport({
+  service: "gmail", // Gmail service
+  host: "smtp.gmail.com", // Gmail SMTP host
+  port: 587,
+  secure: false, // Use TLS
+  auth: {
+    user: process.env.SMTP_EMAIL, // Sender's email
+    pass: process.env.SMTP_PASSWORD, // Your email password or App Password
+  },
+});
 
-// Set SendGrid API key with validation
-const sendgridApiKey = process.env.SENDGRID_API_KEY;
-if (!sendgridApiKey) {
-  throw new Error("SENDGRID_API_KEY is not defined in environment variables");
-}
-sgMail.setApiKey(sendgridApiKey);
-
-const smtpEmail = process.env.SMTP_EMAIL;
-if (!smtpEmail) {
-  throw new Error("SMTP_EMAIL is not defined in environment variables");
-}
-
-// Function to send the email verification - returns a promise that resolves to boolean
+// Function to send the email verification
 const sendConfirmationEmail = (user) => {
-  return new Promise((resolve) => {
-    const verificationUrl = `https://jgaa-projects.vercel.app/verify-email/${user.verification_token}`;
+  const verificationUrl = `https://jgaa-projects-capstone.vercel.app/verify-email?token=${user.verification_token}`;
 
-    const msg = {
-      from: smtpEmail,
-      to: user.email,
-      subject: "Please Verify Your Email Address",
-      text: `Click the following link to verify your email address: ${verificationUrl}`,
-      html: `
-        <p>Good day Sir!</p>
-        <p>This is <b>Jgaa Thai Restaurant</b>. Please <b>Click</b> the following link to verify your email address:</p>
-        <b>This link expires in 7 days</b>
-        <p><a href="${verificationUrl}">${verificationUrl}</a></p>
-        <p>If you did not request this, please ignore this email.</p>
-        <footer>
-          <p>This email was sent to: <b>${user.email}</b> for protecting the security of your account. Please make sure to verify your email to complete your registration.</p>
-          <p>Thank you for registering with us.</p>
-        </footer>
-      `,
-    };
+  const mailOptions = {
+    from: process.env.SMTP_EMAIL, // Sender's email (Gmail)
+    to: user.email, // Recipient's email
+    subject: "Please Verify Your Email Address",
+    text: `Click the following link to verify your email address`,
+    html: `
+     <p>Good day Sir!</p>
+    <p>This is <b>Jgaa Thai Restaurant</b>. Please <b>Click</b> the following link to verify your email address:</p>
+    <b>This link expires in 7 days</b>
+    <p><a href="${verificationUrl}">${verificationUrl}</a></p>
+    <p>If you did not request this, please ignore this email.</p>
+    <footer>
+      <p>This email was sent to: <b>${user.email} for protecting the security of your account. Please make sure to verify your email to complete your registration.</b></p>
+     <p>Thank you for registering with us.</p>
+      </footer>`,
+    headers: {
+      "X-Message-Tag": "verification_email", // Custom header to mark as legit
+      "List-Unsubscribe": "<unsubscribe-link>", // Unsubscribe header
+    },
+  };
 
-    // Send the email using SendGrid
-    sgMail
-      .send(msg)
-      .then(() => {
-        console.log("Verification email sent via SendGrid");
-        resolve(true);
-      })
-      .catch((err) => {
-        console.error("Error sending email via SendGrid:", err);
-        resolve(false);
-      });
+  // Send the email using the transporter
+  transporter.sendMail(mailOptions, (err, info) => {
+    if (err) {
+      console.error("Error sending email:", err);
+      throw new Error("Error sending verification email");
+    }
+    console.log("Verification email sent:", info);
   });
 };
 

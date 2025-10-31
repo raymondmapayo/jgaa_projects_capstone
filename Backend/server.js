@@ -13,8 +13,7 @@ const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 dotenv.config();
-//const { sendConfirmationEmail } = require("./service/SentEmail");
-
+const { sendConfirmationEmail } = require("./service/EmailService");
 const { upload } = require("./cloudinary");
 const app = express();
 
@@ -1501,7 +1500,7 @@ app.post("/forgot_password", (req, res) => {
       async (err2) => {
         if (err2) return res.status(500).json({ message: "DB update error" });
 
-        const resetUrl = `https://jgaa-projects.vercel.app/reset-password/${resetToken}`;
+        const resetUrl = `https://jgaa-projects-capstone.vercel.app/reset-password/${resetToken}`;
         try {
           await sendResetEmail(user, resetUrl);
           return res.json({ success: true, message: "Reset email sent!" });
@@ -2742,29 +2741,32 @@ app.get("/get_reservation", (req, res) => {
     return res.json(results);
   });
 });
-/*
-app.post("/send_reservation_email", async (req, res) => {
-  const { email, full_name, reservation_date, reservation_time, table, body } =
-    req.body;
 
-  try {
-    await sendConfirmationEmail(
-      email,
-      full_name,
-      reservation_date,
-      reservation_time,
-      table,
-      body
-    );
-    res.json({
-      message: "✅ Reservation confirmation email sent successfully",
+// Endpoint to send reservation confirmation email
+app.post("/send_reservation_email", (req, res) => {
+  const { email, full_name, body } = req.body;
+  const subject = "Confirmation of Reservation"; // Fixed subject
+  // Create the email message
+  const message = {
+    to: email, // Recipient's email from the request body
+    from: smtpEmail, // Sender's email from environment variable
+    subject: subject,
+    text: body,
+    html: `<strong>${body}</strong>`,
+  };
+
+  // Send the email using SendGrid
+  sgMail
+    .send(message)
+    .then(() => {
+      console.log("Email sent successfully!");
+      return res.json({ message: "Email sent successfully" });
+    })
+    .catch((error) => {
+      console.error("Error sending email:", error);
+      return res.status(500).json({ error: "Failed to send email" });
     });
-  } catch (error) {
-    console.error("❌ Failed to send reservation email:", error);
-    res.status(500).json({ error: "Failed to send email" });
-  }
 });
-*/
 
 app.post("/most_reserve", (req, res) => {
   const { table_id, reservation_date } = req.body;
