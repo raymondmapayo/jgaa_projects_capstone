@@ -1,11 +1,13 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  host: process.env.MAILTRAP_HOST,
-  port: process.env.MAILTRAP_PORT,
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false, // use TLS
+  requireTLS: true,
   auth: {
-    user: process.env.MAILTRAP_USER,
-    pass: process.env.MAILTRAP_PASS,
+    user: process.env.SMTP_EMAIL,
+    pass: process.env.SMTP_PASSWORD,
   },
 });
 
@@ -13,7 +15,7 @@ const sendConfirmationEmail = async (user) => {
   const verificationUrl = `https://jgaa-projects-capstone.vercel.app/verify-email?token=${user.verification_token}`;
 
   const mailOptions = {
-    from: `"Jgaa Thai Restaurant" <${process.env.SMTP_EMAIL}>`, // ✅ noreply@demomailtrap.co
+    from: `"Jgaa Thai Restaurant" <${process.env.SMTP_EMAIL}>`,
     to: user.email,
     subject: "Please Verify Your Email Address",
     html: `
