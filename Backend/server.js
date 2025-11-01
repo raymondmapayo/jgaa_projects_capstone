@@ -1368,54 +1368,41 @@ app.post("/register", async (req, res) => {
     role = "client",
   } = req.body;
 
-  // Basic validation
   if (!fname || !lname || !email || !password) {
     return res.status(400).json({
       success: false,
-      message:
-        "Please provide all required fields: fname, lname, email, password",
+      message: "Please provide all required fields",
     });
   }
 
-  try {
-    const checkEmailSql = "SELECT * FROM user_tbl WHERE email = ?";
+  db.query(
+    "SELECT * FROM user_tbl WHERE email = ?",
+    [email],
+    async (err, results) => {
+      if (err)
+        return res
+          .status(500)
+          .json({ success: false, message: "Error checking email" });
+      if (results.length > 0)
+        return res
+          .status(400)
+          .json({ success: false, message: "Email already in use" });
 
-    db.query(checkEmailSql, [email], async (checkError, checkResults) => {
-      if (checkError) {
-        console.error("Error checking email:", checkError);
-        return res.status(500).json({
-          success: false,
-          message: "Error checking email",
-        });
-      }
-
-      if (checkResults.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Email is already in use",
-        });
-      }
-
-      // Hash password
       const hashedPassword = crypto
         .createHash("sha256")
         .update(password)
         .digest("hex");
-
-      // Generate verification token FIRST
       const verificationToken = crypto.randomBytes(32).toString("hex");
       const tokenExpiry = new Date();
       tokenExpiry.setDate(tokenExpiry.getDate() + 7);
 
-      // Insert user with verification token in ONE query
-      const sql = `
-        INSERT INTO user_tbl 
-        (fname, lname, pnum, email, password, address, role, status, verification_token, token_expiry) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'inactive', ?, ?)
-      `;
-
+      const insertSql = `
+      INSERT INTO user_tbl 
+      (fname, lname, pnum, email, password, address, role, status, verification_token, token_expiry) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'inactive', ?, ?)
+    `;
       db.query(
-        sql,
+        insertSql,
         [
           fname,
           lname,
@@ -1427,56 +1414,26 @@ app.post("/register", async (req, res) => {
           verificationToken,
           tokenExpiry,
         ],
-        async (error, results) => {
-          if (error) {
-            console.error("Error inserting user into the database:", error);
-            return res.status(500).json({
-              success: false,
-              message: "Error creating user account",
-            });
-          }
+        async (insertErr) => {
+          if (insertErr)
+            return res
+              .status(500)
+              .json({ success: false, message: "Error creating user" });
 
-          try {
-            // Try to send email (but don't crash if it fails)
-            const emailSent = await sendConfirmationEmail({
-              email: email,
-              verification_token: verificationToken,
-            });
-
-            if (emailSent) {
-              res.status(200).json({
-                success: true,
-                message:
-                  "User registered successfully. A verification link has been sent to your email.",
-              });
-            } else {
-              res.status(200).json({
-                success: true,
-                message:
-                  "Account created successfully! Please check your email for verification link.",
-                warning:
-                  "If you don't receive the email, check your spam folder.",
-              });
-            }
-          } catch (emailError) {
-            console.error("Email service error:", emailError);
-            // Still success because user was created
-            res.status(200).json({
-              success: true,
-              message:
-                "Account created successfully! Please check your email for verification link.",
-            });
-          }
+          const emailSent = await sendConfirmationEmail({
+            email,
+            verification_token: verificationToken,
+          });
+          res.status(200).json({
+            success: true,
+            message: emailSent
+              ? "User registered successfully. Verification email sent."
+              : "User registered, but email could not be sent. Check your spam folder.",
+          });
         }
       );
-    });
-  } catch (err) {
-    console.error("Error in registration flow:", err);
-    res.status(500).json({
-      success: false,
-      message: "Error in registration process",
-    });
-  }
+    }
+  );
 });
 // ==================== Forgot Password ====================
 app.post("/forgot_password", (req, res) => {
@@ -1749,52 +1706,40 @@ app.post("/check-email", (req, res) => {
 
 // Route to handle email verification
 
+// Verify email
 app.get("/verify-email/:token", (req, res) => {
   const { token } = req.params;
+  db.query(
+    "SELECT * FROM user_tbl WHERE verification_token = ? AND token_expiry > NOW()",
+    [token],
+    (err, results) => {
+      if (err)
+        return res
+          .status(500)
+          .json({ success: false, message: "Server error" });
+      if (results.length === 0)
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid or expired token" });
 
-  console.log("Verification attempt with token:", token);
+      const user = results[0];
+      db.query(
+        "UPDATE user_tbl SET status = 'active', verification_token = NULL WHERE user_id = ?",
+        [user.user_id],
+        (updateErr) => {
+          if (updateErr)
+            return res
+              .status(500)
+              .json({ success: false, message: "Error activating account" });
 
-  const sql =
-    "SELECT * FROM user_tbl WHERE verification_token = ? AND token_expiry > NOW()";
-
-  db.query(sql, [token], (err, results) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Server error during verification",
-      });
+          res.json({
+            success: true,
+            message: "Email verified successfully! You can now login.",
+          });
+        }
+      );
     }
-
-    if (results.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired verification token",
-      });
-    }
-
-    const user = results[0];
-
-    // Update user status to active
-    const updateSql =
-      "UPDATE user_tbl SET status = 'active', verification_token = NULL WHERE user_id = ?";
-
-    db.query(updateSql, [user.user_id], (updateErr) => {
-      if (updateErr) {
-        console.error("Error updating user:", updateErr);
-        return res.status(500).json({
-          success: false,
-          message: "Error activating account",
-        });
-      }
-
-      console.log("✅ User verified successfully:", user.email);
-      res.json({
-        success: true,
-        message: "Email verified successfully! You can now login.",
-      });
-    });
-  });
+  );
 });
 
 app.get("/get_users", (request, response) => {
