@@ -1,37 +1,40 @@
-// service/EmailService.js
-const axios = require("axios");
+const nodemailer = require("nodemailer");
+
+const transporter = nodemailer.createTransport({
+  host: process.env.MAILTRAP_HOST,
+  port: process.env.MAILTRAP_PORT,
+  auth: {
+    user: process.env.MAILTRAP_USER,
+    pass: process.env.MAILTRAP_PASS,
+  },
+});
 
 const sendConfirmationEmail = async (user) => {
   const verificationUrl = `https://jgaa-projects-capstone.vercel.app/verify-email?token=${user.verification_token}`;
 
-  const data = {
-    service_id: process.env.SERVICE_ID, // Your EmailJS service ID
-    template_id: process.env.TEMPLATE_ID, // Your EmailJS template ID
-    user_id: process.env.PUBLIC_KEY, // Your EmailJS public key
-    template_params: {
-      to_name: user.name || "User",
-      to_email: user.email,
-      verification_url: verificationUrl,
-    },
+  const mailOptions = {
+    from: `"Jgaa Thai Restaurant" <${process.env.SMTP_EMAIL}>`,
+    to: user.email,
+    subject: "Please Verify Your Email Address",
+    html: `
+      <p>Good day!</p>
+      <p>This is <b>Jgaa Thai Restaurant</b>. Please click the link below to verify your email:</p>
+      <p><a href="${verificationUrl}">${verificationUrl}</a></p>
+      <b>This link expires in 7 days.</b>
+      <br><br>
+      <footer>
+        <p>This email was sent to <b>${user.email}</b> for verification.</p>
+        <p>Thank you for registering with us!</p>
+      </footer>
+    `,
   };
 
   try {
-    const response = await axios.post(
-      "https://api.emailjs.com/api/v1.0/email/send",
-      data,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    console.log("✅ Verification email sent via EmailJS:", response.data);
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ Verification email sent:", info.messageId);
     return true;
   } catch (err) {
-    console.error(
-      "❌ Error sending email via EmailJS:",
-      err.response?.data || err.message
-    );
+    console.error("❌ Error sending email:", err);
     return false;
   }
 };

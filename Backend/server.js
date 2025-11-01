@@ -1437,10 +1437,9 @@ app.post("/register", async (req, res) => {
           }
 
           try {
-            // Send email via EmailJS
+            // Try to send email (but don't crash if it fails)
             const emailSent = await sendConfirmationEmail({
-              email,
-              name: `${fname} ${lname}`,
+              email: email,
               verification_token: verificationToken,
             });
 
@@ -2691,7 +2690,27 @@ app.get("/get_reserved_tables", (req, res) => {
     return res.json(reservedTables);
   });
 });
+/*
+const message = {
+  to: "raymondmapayo@gmail.com", // Change to your recipient
+  from: "raymondmapayo@gmail.com", // Change to your verified sender
+  subject: "Sending with SendGrid is Fun",
+  text: "and easy to do anywhere, even with Node.js",
+  html: "<strong>and easy to do anywhere, even with Node.js</strong>",
+};
 
+const sendEmail = async (message) => {
+  try {
+    await sgMail.send(message);
+    console.log("Email sent successfully");
+  } catch (error) {
+    console.error("Error sending email:", error);
+    if (error.response) {
+      console.error("Response:", error.response.body);
+    }
+  }
+};
+*/
 // Endpoint to fetch reservations (for example)
 app.get("/get_reservation", (req, res) => {
   const sql = `
@@ -2749,7 +2768,7 @@ app.post("/send_reservation_email", (req, res) => {
       return res.status(500).json({ error: "Failed to send email" });
     });
 });
- */
+*/
 app.post("/most_reserve", (req, res) => {
   const { table_id, reservation_date } = req.body;
 
